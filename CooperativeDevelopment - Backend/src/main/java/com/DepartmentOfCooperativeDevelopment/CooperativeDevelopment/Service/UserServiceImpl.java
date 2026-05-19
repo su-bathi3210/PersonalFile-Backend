@@ -2,10 +2,8 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service;
 
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.PasswordChangeRequest;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.RegisterRequest;
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.IncrementForm;
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Notification;
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Role;
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.*;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.DataChangeHistoryRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.IncrementFormRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.NotificationRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.UserRepository;
@@ -38,6 +36,8 @@ public class UserServiceImpl implements UserService {
 
     private final IncrementFormRepository incrementFormRepository;
 
+    private final DataChangeHistoryRepository historyRepository;
+
     @Override
     public User registerEmployee(RegisterRequest request) {
 
@@ -63,6 +63,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void updatePersonalFile(String id, User updateData, String currentUserEmail, Collection<? extends GrantedAuthority> authorities) {
         User userToUpdate = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + id));
@@ -70,14 +71,94 @@ public class UserServiceImpl implements UserService {
         boolean isAdmin = authorities.stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_PERSONALFILE_ADMIN"));
 
+        List<DataChangeHistory.FieldChange> fieldChanges = new ArrayList<>();
+
+        compareAndAdd(fieldChanges, "username", userToUpdate.getUsername(), updateData.getUsername());
+        compareAndAdd(fieldChanges, "email", userToUpdate.getEmail(), updateData.getEmail());
+        compareAndAdd(fieldChanges, "nic", userToUpdate.getNic(), updateData.getNic());
+        compareAndAdd(fieldChanges, "address", userToUpdate.getAddress(), updateData.getAddress());
+        compareAndAdd(fieldChanges, "phoneNumber", userToUpdate.getPhoneNumber(), updateData.getPhoneNumber());
+        compareAndAdd(fieldChanges, "profileImage", userToUpdate.getProfileImage(), updateData.getProfileImage());
+        compareAndAdd(fieldChanges, "gender", userToUpdate.getGender(), updateData.getGender());
+        compareAndAdd(fieldChanges, "dateOfBirth",
+                userToUpdate.getDateOfBirth() != null ? userToUpdate.getDateOfBirth().toString() : null,
+                updateData.getDateOfBirth() != null ? updateData.getDateOfBirth().toString() : null);
+
+        if (isAdmin) {
+            compareAndAdd(fieldChanges, "wnopNumber", userToUpdate.getWnopNumber(), updateData.getWnopNumber());
+            compareAndAdd(fieldChanges, "serviceNumber", userToUpdate.getServiceNumber(), updateData.getServiceNumber());
+            compareAndAdd(fieldChanges, "department", userToUpdate.getDepartment(), updateData.getDepartment());
+            compareAndAdd(fieldChanges, "designation", userToUpdate.getDesignation(), updateData.getDesignation());
+            compareAndAdd(fieldChanges, "dutyPlace", userToUpdate.getDutyPlace(), updateData.getDutyPlace());
+            compareAndAdd(fieldChanges, "grade", userToUpdate.getGrade(), updateData.getGrade());
+            compareAndAdd(fieldChanges, "salaryScale", userToUpdate.getSalaryScale(), updateData.getSalaryScale());
+
+            compareAndAdd(fieldChanges, "dateOfLanguageProficiency",
+                    userToUpdate.getDateOfLanguageProficiency() != null ? userToUpdate.getDateOfLanguageProficiency().toString() : null,
+                    updateData.getDateOfLanguageProficiency() != null ? updateData.getDateOfLanguageProficiency().toString() : null);
+
+            compareAndAdd(fieldChanges, "dateOfFirstAppointment",
+                    userToUpdate.getDateOfFirstAppointment() != null ? userToUpdate.getDateOfFirstAppointment().toString() : null,
+                    updateData.getDateOfFirstAppointment() != null ? updateData.getDateOfFirstAppointment().toString() : null);
+
+            compareAndAdd(fieldChanges, "appointmentDateToPresentStatus",
+                    userToUpdate.getAppointmentDateToPresentStatus() != null ? userToUpdate.getAppointmentDateToPresentStatus().toString() : null,
+                    updateData.getAppointmentDateToPresentStatus() != null ? updateData.getAppointmentDateToPresentStatus().toString() : null);
+
+            compareAndAdd(fieldChanges, "incrementDate",
+                    userToUpdate.getIncrementDate() != null ? userToUpdate.getIncrementDate().toString() : null,
+                    updateData.getIncrementDate() != null ? updateData.getIncrementDate().toString() : null);
+
+            compareAndAdd(fieldChanges, "dateOfReceiptOfRelevantGrade",
+                    userToUpdate.getDateOfReceiptOfRelevantGrade() != null ? userToUpdate.getDateOfReceiptOfRelevantGrade().toString() : null,
+                    updateData.getDateOfReceiptOfRelevantGrade() != null ? updateData.getDateOfReceiptOfRelevantGrade().toString() : null);
+
+            compareAndAdd(fieldChanges, "dateOfCompulsoryRetirement",
+                    userToUpdate.getDateOfCompulsoryRetirement() != null ? userToUpdate.getDateOfCompulsoryRetirement().toString() : null,
+                    updateData.getDateOfCompulsoryRetirement() != null ? updateData.getDateOfCompulsoryRetirement().toString() : null);
+
+            compareAndAdd(fieldChanges, "presentStatusDate",
+                    userToUpdate.getPresentStatusDate() != null ? userToUpdate.getPresentStatusDate().toString() : null,
+                    updateData.getPresentStatusDate() != null ? updateData.getPresentStatusDate().toString() : null);
+
+            compareAndAdd(fieldChanges, "dateOfReceiptGradeI",
+                    userToUpdate.getDateOfReceiptGradeI() != null ? userToUpdate.getDateOfReceiptGradeI().toString() : null,
+                    updateData.getDateOfReceiptGradeI() != null ? updateData.getDateOfReceiptGradeI().toString() : null);
+
+            compareAndAdd(fieldChanges, "dateOfReceiptGradeII",
+                    userToUpdate.getDateOfReceiptGradeII() != null ? userToUpdate.getDateOfReceiptGradeII().toString() : null,
+                    updateData.getDateOfReceiptGradeII() != null ? updateData.getDateOfReceiptGradeII().toString() : null);
+
+            compareAndAdd(fieldChanges, "dateOfReceiptGradeIII",
+                    userToUpdate.getDateOfReceiptGradeIII() != null ? userToUpdate.getDateOfReceiptGradeIII().toString() : null,
+                    updateData.getDateOfReceiptGradeIII() != null ? updateData.getDateOfReceiptGradeIII().toString() : null);
+        }
+
+        if (!fieldChanges.isEmpty()) {
+            long currentCount = historyRepository.countByUserId(id);
+            int nextRevision = (int) currentCount + 1;
+
+            String roleDisplay = isAdmin ? "PERSONALFILE_ADMIN" : "EMPLOYEE";
+
+            DataChangeHistory historyEntry = DataChangeHistory.builder()
+                    .userId(id)
+                    .employeeName(userToUpdate.getUsername())
+                    .changedBy(roleDisplay)
+                    .changedAt(LocalDateTime.now())
+                    .revisionNumber(nextRevision)
+                    .changes(fieldChanges)
+                    .build();
+
+            historyRepository.save(historyEntry);
+        }
         userToUpdate.setUsername(updateData.getUsername());
         userToUpdate.setEmail(updateData.getEmail());
-        userToUpdate.setProfileImage(updateData.getProfileImage());
         userToUpdate.setNic(updateData.getNic());
         userToUpdate.setAddress(updateData.getAddress());
-        userToUpdate.setDateOfBirth(updateData.getDateOfBirth());
-        userToUpdate.setGender(updateData.getGender());
         userToUpdate.setPhoneNumber(updateData.getPhoneNumber());
+        userToUpdate.setProfileImage(updateData.getProfileImage());
+        userToUpdate.setGender(updateData.getGender());
+        userToUpdate.setDateOfBirth(updateData.getDateOfBirth());
 
         if (isAdmin) {
             userToUpdate.setWnopNumber(updateData.getWnopNumber());
@@ -98,11 +179,42 @@ public class UserServiceImpl implements UserService {
             userToUpdate.setDateOfReceiptGradeI(updateData.getDateOfReceiptGradeI());
             userToUpdate.setDateOfReceiptGradeII(updateData.getDateOfReceiptGradeII());
             userToUpdate.setDateOfReceiptGradeIII(updateData.getDateOfReceiptGradeIII());
-        } else {
-            System.out.println("Work details update skipped: User is not an Admin");
         }
 
-        userRepository.save(userToUpdate);
+            userRepository.save(userToUpdate);
+    }
+
+    private void compareAndAdd(List<DataChangeHistory.FieldChange> list, String fieldName, String oldVal, String newVal) {
+        String actualOld = oldVal == null ? "" : oldVal.trim();
+        String actualNew = newVal == null ? "" : newVal.trim();
+
+        if (!actualOld.equals(actualNew)) {
+            list.add(new DataChangeHistory.FieldChange(fieldName, actualOld, actualNew));
+        }
+    }
+
+    @Override
+    public List<DataChangeHistory> getUserHistoryByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        return historyRepository.findByUserIdOrderByChangedAtDesc(user.getId());
+    }
+
+    @Override
+    public long getChangeCountByEmail(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+        return historyRepository.countByUserId(user.getId());
+    }
+
+    @Override
+    public List<DataChangeHistory> getUserHistory(String userId) {
+        return historyRepository.findByUserIdOrderByChangedAtDesc(userId);
+    }
+
+    @Override
+    public long getChangeCount(String userId) {
+        return historyRepository.countByUserId(userId);
     }
 
     public List<User> getAllEmployeesOnly() {

@@ -1,6 +1,7 @@
 package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Controller;
 
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.IncrementUpdateDTO;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.DataChangeHistory;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.IncrementForm;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Notification;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
@@ -166,5 +167,29 @@ public class PersonalFileController {
     public ResponseEntity<?> updateIncrementDate(@PathVariable String userId, @RequestBody IncrementUpdateDTO dto) {
         userService.updateNextIncrementDate(userId, dto.getNextIncrementDate());
         return ResponseEntity.ok("Increment date updated successfully");
+    }
+
+    @GetMapping("/history/{userId}")
+    @PreAuthorize("hasAnyRole('PERSONALFILE_ADMIN', 'EMPLOYEE')")
+    public ResponseEntity<List<DataChangeHistory>> getEmployeeHistory(@PathVariable String userId) {
+        return ResponseEntity.ok(userService.getUserHistory(userId));
+    }
+
+    @GetMapping("/history/count/{userId}")
+    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
+    public ResponseEntity<Long> getEmployeeChangeCount(@PathVariable String userId) {
+        return ResponseEntity.ok(userService.getChangeCount(userId));
+    }
+
+    @GetMapping("/history/by-email/{email}")
+    @PreAuthorize("hasAnyRole('PERSONALFILE_ADMIN', 'EMPLOYEE')")
+    public ResponseEntity<List<DataChangeHistory>> getEmployeeHistoryByEmail(@PathVariable String email) {
+        return ResponseEntity.ok(userService.getUserHistoryByEmail(email));
+    }
+
+    @GetMapping("/history/count/by-email/{email}")
+    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
+    public ResponseEntity<Long> getEmployeeChangeCountByEmail(@PathVariable String email) {
+        return ResponseEntity.ok(userService.getChangeCountByEmail(email));
     }
 }

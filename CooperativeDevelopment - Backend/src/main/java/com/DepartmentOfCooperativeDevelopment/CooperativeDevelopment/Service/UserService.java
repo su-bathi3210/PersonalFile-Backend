@@ -3,6 +3,7 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.IncrementNotificationResponse;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.PasswordChangeRequest;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.RegisterRequest;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.DataChangeHistory;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
 import org.springframework.security.core.GrantedAuthority;
 
@@ -23,5 +24,9 @@ public interface UserService {
     void sendIncrementNotification(String userId);
     List<IncrementNotificationResponse> getAllIncrementNotifications();
     void updateNextIncrementDate(String userId, String nextIncrementDate);
+    List<DataChangeHistory> getUserHistory(String userId);
+    long getChangeCount(String userId);
+    List<DataChangeHistory> getUserHistoryByEmail(String email);
+    long getChangeCountByEmail(String email);
     void updatePersonalFile(String email, User updateData, String currentUserEmail, Collection<? extends GrantedAuthority> authorities);
 }

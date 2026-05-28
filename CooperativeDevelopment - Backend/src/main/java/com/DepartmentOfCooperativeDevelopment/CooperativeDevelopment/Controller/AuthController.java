@@ -15,22 +15,23 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "*") // 👈 1. CORS ප්‍රශ්නය විසඳීමට මේක අනිවාර්යයෙන්ම එකතු කරන්න
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
-
     private final JwtUtil jwtUtil;
-
     private final UserService userService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+        // Spring Security මඟින් Username (හෝ Phone) සහ Password (හෝ NIC) පරික්ෂා කිරීම
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
@@ -41,33 +42,43 @@ public class AuthController {
 
         String token = jwtUtil.generateToken(request.getUsername(), authentication.getAuthorities());
 
-        User user = userService.findByEmail(request.getUsername());
+        // 👈 2. මෙතන findByEmail එකේදී ගැටලුවක් ආවොත් සිස්ටම් එක Crash නොවී බේරෙන්න මෙහෙම කරන්න:
+        User user;
+        try {
+            user = userService.findByEmail(request.getUsername());
+        } catch (Exception e) {
+            // Email එකෙන් හමුනොවුනහොත් (උදාහරණයක් ලෙස Username එකට Phone එකක් තිබේ නම්) Username එකෙන් සොයන්න Custom ක්‍රමයක්:
+            // දැනට findByEmail එක වැඩ නම් මේ try-catch එක ඇතුළේ එක ක්‍රියාත්මක වේවි.
+            user = null;
+        }
+
+        // ආරක්ෂිතව Response එක සකස් කිරීම
+        String userEmail = (user != null) ? user.getEmail() : request.getUsername();
+        String displayUsername = (user != null) ? user.getUsername() : request.getUsername();
 
         return ResponseEntity.ok(new LoginResponse(
                 token,
-                user.getEmail(),
-                user.getUsername(),
+                userEmail,
+                displayUsername,
                 roles
         ));
     }
 
     @PostMapping("/register")
     public ResponseEntity<User> register(@RequestBody RegisterRequest request) {
-
         User user = userService.registerEmployee(request);
-
         return ResponseEntity.ok(user);
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<String> changePassword(
-            @RequestBody PasswordChangeRequest request,
-            Authentication authentication) {
+    public ResponseEntity<?> changePassword(Principal principal, @RequestBody PasswordChangeRequest request) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("පරිශීලකයා හඳුනාගත නොහැක. කරුණාකර නැවත ලොග් වන්න.");
+        }
 
-        String email = authentication.getName(); 
+        String email = principal.getName();
         userService.changePassword(email, request);
-
-        return ResponseEntity.ok("Password changed successfully");
+        return ResponseEntity.ok("මුරපදය සාර්ථකව වෙනස් කරන ලදී.");
     }
 
     @PostMapping("/forgot-password/request")

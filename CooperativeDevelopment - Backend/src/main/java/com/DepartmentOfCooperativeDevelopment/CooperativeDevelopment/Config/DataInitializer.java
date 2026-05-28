@@ -44,6 +44,7 @@ public class DataInitializer implements CommandLineRunner {
         if (!userRepository.existsByUsername("vehicle.approval")) {
             User vApprove = User.builder()
                     .username("vehicle.approval")
+                    .email("vapproval@gov.lk")
                     .password(passwordEncoder.encode("Approve@123"))
                     .roles(Set.of(Role.VEHICLE_APPROVAL))
                     .build();
@@ -51,12 +52,13 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         if (!userRepository.existsByUsername("pf.approval")) {
-            User vApprove = User.builder()
+            User pfApprove = User.builder()
                     .username("pf.approval")
+                    .email("pfapproval@gov.lk")
                     .password(passwordEncoder.encode("Approve@123"))
                     .roles(Set.of(Role.PERSONALFILE_APPROVAL))
                     .build();
-            userRepository.save(vApprove);
+            userRepository.save(pfApprove);
         }
     }
 }

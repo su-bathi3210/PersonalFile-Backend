@@ -49,9 +49,12 @@ public class SecurityConfig {
 
                         .requestMatchers("/departments/add").hasRole("PERSONALFILE_ADMIN")
 
+                        .requestMatchers("/drivers/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE", "DRIVER")
+                        .requestMatchers("/vehicles/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE")
+
                         .requestMatchers("/increment-form/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")
 
-                        .requestMatchers("/api/vehicle/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL")
+                        .requestMatchers("vehicle-requests/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE", "DRIVER")
 
                         .requestMatchers("/personalfile/update-profile/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")
                         .requestMatchers("/personalfile/upload-employees").hasRole("PERSONALFILE_ADMIN")

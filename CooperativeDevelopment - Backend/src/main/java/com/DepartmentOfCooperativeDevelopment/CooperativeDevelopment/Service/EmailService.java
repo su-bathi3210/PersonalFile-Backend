@@ -35,4 +35,24 @@ public class EmailService {
         message.setText(emailContent);
         mailSender.send(message);
     }
+
+    public void sendVehicleAssignmentEmail(String to, String employeeName, String vehicleNo, String vehicleModel, String driverName, String driverPhone) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject("වාහන වෙන්කිරීම තහවුරු කිරීම - DCD System");
+
+        String emailContent = "හිතවත් " + employeeName + ",\n\n" +
+                "ඔබ විසින් ඉදිරිපත් කරන ලද වාහන ඉල්ලුම්පත (Vehicle Request) සාර්ථකව අනුමත කර අවසන් කර ඇත.\n\n" +
+                "ඔබ වෙනුවෙන් වෙන් කරන ලද වාහන සහ රියදුරු විස්තර පහත පරිදි වේ:\n" +
+                "----------------------------------------\n" +
+                "• වාහන අංකය (Vehicle No): " + vehicleNo + "\n" +
+                "• වාහන වර්ගය (Model): " + vehicleModel + "\n" +
+                "• රියදුරුගේ නම (Driver Name): " + driverName + "\n" +
+                "• දුරකථන අංකය (Driver Phone): " + driverPhone + "\n" +
+                "----------------------------------------\n\n" +
+                "ස්තුතියි,\nපාලන අංශය (Vehicle Administration).";
+
+        message.setText(emailContent);
+        mailSender.send(message);
+    }
 }

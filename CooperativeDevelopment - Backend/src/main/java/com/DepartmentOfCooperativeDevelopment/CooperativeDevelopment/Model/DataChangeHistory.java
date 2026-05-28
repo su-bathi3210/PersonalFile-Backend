@@ -32,6 +32,6 @@ public class DataChangeHistory {
     public static class FieldChange {
         private String fieldName;
         private String oldValue;
-        private String newValue;
+        private String newValue;    
     }
 }

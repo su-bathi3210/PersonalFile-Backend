@@ -1,10 +1,13 @@
 package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 @Getter
@@ -37,7 +40,10 @@ public class User {
     private String designation;
     private LocalDate dateOfFirstAppointment;
     private LocalDate appointmentDateToPresentStatus;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate incrementDate;
+
     private String dutyPlace;
     private String grade;
     private LocalDate dateOfReceiptOfRelevantGrade;
@@ -50,4 +56,6 @@ public class User {
     private LocalDate dateOfReceiptGradeIII;
 
     private String incrementStatus;
+
+    private Map<String, Object> dynamicFields = new HashMap<>();
 }

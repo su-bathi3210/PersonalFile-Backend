@@ -1,17 +1,17 @@
 package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Controller;
 
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.IncrementNotificationResponse;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.IncrementUpdateDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.DataChangeHistory;
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.IncrementForm;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Notification;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.IncrementFormRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.NotificationRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.UserRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service.ExcelService;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/personalfile")
@@ -27,16 +28,10 @@ import java.util.List;
 public class PersonalFileController {
 
     private final UserService userService;
-
     private final UserRepository userRepository;
-
     private final PasswordEncoder passwordEncoder;
-
     private final ExcelService excelService;
-
     private final NotificationRepository notificationRepository;
-
-    private final IncrementFormRepository incrementFormRepository;
 
     @GetMapping("/me")
     public ResponseEntity<User> getCurrentUser(@RequestParam String email) {
@@ -95,7 +90,7 @@ public class PersonalFileController {
     @PostMapping("/upload-employees")
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
     public ResponseEntity<?> uploadEmployees(@RequestParam("file") MultipartFile file) {
- 
+
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("Please select an Excel file.");
         }
@@ -124,12 +119,31 @@ public class PersonalFileController {
 
     @PostMapping("/send-increment-email/{id}")
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
-    public ResponseEntity<?> sendIncrementEmail(@PathVariable String id) {
+    public ResponseEntity<?> sendIncrementEmail(@PathVariable String id, @RequestBody List<String> templateNames) {
         try {
-            userService.sendIncrementNotification(id);
-            return ResponseEntity.ok("The email was sent successfully.");
+            userService.sendIncrementNotification(id, templateNames);
+            return ResponseEntity.ok("The email and notification with selected templates were sent successfully.");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/upload-submitted-forms")
+    @PreAuthorize("hasAnyRole('PERSONALFILE_ADMIN', 'EMPLOYEE')")
+    public ResponseEntity<?> uploadSubmittedForms(
+            @RequestParam("notificationId") String notificationId,
+            @RequestParam("files") List<MultipartFile> files) {
+
+        if (files == null || files.isEmpty()) {
+            return ResponseEntity.badRequest().body("Please select at least one file to upload.");
+        }
+
+        try {
+            userService.uploadSubmittedForms(notificationId, files);
+            return ResponseEntity.ok("Your increment forms have been uploaded successfully!");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("File upload failed: " + e.getMessage());
         }
     }
 
@@ -140,12 +154,10 @@ public class PersonalFileController {
 
     @PutMapping("/notifications/read/{id}")
     public ResponseEntity<?> markNotificationAsRead(@PathVariable String id) {
-
         Notification notification = notificationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
 
         notification.setRead(true);
-
         notificationRepository.save(notification);
 
         return ResponseEntity.ok("Notification marked as read");
@@ -191,5 +203,38 @@ public class PersonalFileController {
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
     public ResponseEntity<Long> getEmployeeChangeCountByEmail(@PathVariable String email) {
         return ResponseEntity.ok(userService.getChangeCountByEmail(email));
+    }
+
+    @PutMapping("/increment-notifications/mark-as-read/{email}")
+    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
+    public ResponseEntity<?> markProfileNotificationsAsRead(@PathVariable String email) {
+        try {
+            userService.resolveProfileUpdateNotifications(email);
+            return ResponseEntity.ok("Profile update notifications resolved successfully for: " + email);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @PostMapping(value = "/notifications/{notificationId}/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<String> uploadIncrementForms(
+            @PathVariable String notificationId,
+            @RequestParam("files") List<MultipartFile> files) {
+
+        userService.uploadSubmittedForms(notificationId, files);
+        return ResponseEntity.ok("Increment forms uploaded successfully!");
+    }
+
+    @GetMapping("/admin/increment-notifications")
+    @PreAuthorize("hasRole('ROLE_PERSONALFILE_ADMIN')")
+    public ResponseEntity<List<IncrementNotificationResponse>> getAllIncrementNotifications() {
+        List<IncrementNotificationResponse> responses = userService.getAllIncrementNotifications();
+        return ResponseEntity.ok(responses);
+    }
+    
+    @PutMapping("/increment-notifications/{id}/approve")
+    public ResponseEntity<?> approveIncrement(@PathVariable String id) {
+        userService.approveIncrementNotification(id);
+        return ResponseEntity.ok().body(Map.of("message", "Increment successfully approved and date updated to next year."));
     }
 }

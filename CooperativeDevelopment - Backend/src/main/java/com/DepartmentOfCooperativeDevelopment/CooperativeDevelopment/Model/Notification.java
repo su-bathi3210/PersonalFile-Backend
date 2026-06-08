@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -23,4 +24,8 @@ public class Notification {
     private boolean isIncrementType;
     private boolean read;
     private String status;
+
+    private List<String> requestedTemplates;
+    private List<String> submittedFileUrls;
+    private LocalDateTime submittedAt;
 }

@@ -46,8 +46,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/departments/all").permitAll()
+                        .requestMatchers("/uploads/**").permitAll()
 
                         .requestMatchers("/departments/add").hasRole("PERSONALFILE_ADMIN")
+
+                        .requestMatchers("/dynamic-fields/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")
 
                         .requestMatchers("/drivers/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE", "DRIVER")
                         .requestMatchers("/vehicles/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE")

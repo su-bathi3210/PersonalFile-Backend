@@ -6,6 +6,7 @@ import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.Registe
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.DataChangeHistory;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collection;
 import java.util.List;
@@ -21,12 +22,15 @@ public interface UserService {
     void processForgotPassword(String email, String serviceNumber);
     boolean verifyOTP(String email, String otp);
     void resetPassword(String email, String newPassword);
-    void sendIncrementNotification(String userId);
     List<IncrementNotificationResponse> getAllIncrementNotifications();
     void updateNextIncrementDate(String userId, String nextIncrementDate);
     List<DataChangeHistory> getUserHistory(String userId);
     long getChangeCount(String userId);
     List<DataChangeHistory> getUserHistoryByEmail(String email);
     long getChangeCountByEmail(String email);
+    void resolveProfileUpdateNotifications(String email);
+    void sendIncrementNotification(String userId, List<String> templateNames);
+    void uploadSubmittedForms(String notificationId, List<MultipartFile> files);
+    void approveIncrementNotification(String notificationId);
     void updatePersonalFile(String email, User updateData, String currentUserEmail, Collection<? extends GrantedAuthority> authorities);
 }

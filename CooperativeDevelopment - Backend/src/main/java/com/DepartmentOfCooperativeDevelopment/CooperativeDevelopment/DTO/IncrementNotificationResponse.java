@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -20,4 +21,7 @@ public class IncrementNotificationResponse {
     private String status;
     private LocalDateTime sentDate;
     private LocalDateTime submittedDate;
+
+    private List<String> requestedTemplates;
+    private List<String> submittedFileUrls;
 }

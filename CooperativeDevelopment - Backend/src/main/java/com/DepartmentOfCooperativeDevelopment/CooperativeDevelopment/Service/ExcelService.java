@@ -106,11 +106,18 @@ public class ExcelService {
         }
 
         try {
-            String val = new DataFormatter().formatCellValue(cell);
+            String val = new DataFormatter().formatCellValue(cell).trim();
             if (!val.isEmpty()) {
+
+                if (val.contains("/")) {
+                    java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy");
+                    return java.time.LocalDate.parse(val, formatter);
+                }
+
                 return java.time.LocalDate.parse(val);
             }
         } catch (Exception e) {
+            System.err.println("Error parsing date for column [" + colName + "] with value [" + cell + "]: " + e.getMessage());
             return null;
         }
 

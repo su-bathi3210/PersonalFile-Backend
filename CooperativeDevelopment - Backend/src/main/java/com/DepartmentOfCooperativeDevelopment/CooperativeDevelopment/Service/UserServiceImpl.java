@@ -133,7 +133,6 @@ public class UserServiceImpl implements UserService {
         List<Notification> notifications = notificationRepository.findAll();
 
         return notifications.stream()
-                .filter(Notification::isIncrementType)
                 .map(notification -> {
                     User user = userRepository.findById(notification.getUserId()).orElse(null);
                     if (user == null) return null;

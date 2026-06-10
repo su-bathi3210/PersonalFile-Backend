@@ -107,6 +107,24 @@ public class PersonalFileController {
             if (users.isEmpty()) {
                 return ResponseEntity.badRequest().body("No data was found in the Excel file.");
             }
+
+            for (User u : users) {
+                boolean isDuplicate = userRepository.existsByUsernameAndAddressAndNicAndEmailAndPhoneNumberAndDateOfBirth(
+                        u.getUsername(),
+                        u.getAddress(),
+                        u.getNic(),
+                        u.getEmail(),
+                        u.getPhoneNumber(),
+                        u.getDateOfBirth()
+                );
+
+                if (isDuplicate) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body("This employee has already been added to the system! (Name: "
+                                    + u.getUsername() + ", NIC: " + u.getNic() + ")");
+                }
+            }
+
             userRepository.saveAll(users);
 
             return ResponseEntity.ok("Employees " + users.size() + " People were successfully added to the system.");

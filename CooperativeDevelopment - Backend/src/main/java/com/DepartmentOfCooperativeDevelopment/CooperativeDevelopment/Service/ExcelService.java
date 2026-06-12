@@ -16,6 +16,8 @@ public class ExcelService {
 
     public List<User> parseExcel(InputStream is, PasswordEncoder passwordEncoder) {
         List<User> users = new ArrayList<>();
+        Set<String> seenNicsInExcel = new HashSet<>();
+
         try (Workbook workbook = new XSSFWorkbook(is)) {
             Sheet sheet = workbook.getSheetAt(0);
             Map<String, Integer> headerMap = new HashMap<>();
@@ -41,15 +43,27 @@ public class ExcelService {
                 Row row = rows.next();
 
                 String empName = getVal(row, headerMap, "Name Of The Employee");
-
                 if (empName == null || empName.isEmpty()) continue;
+
+                String nic = getVal(row, headerMap, "National ID");
+                if (nic != null) {
+                    nic = nic.trim();
+                }
+
+                if (nic != null && !nic.isEmpty()) {
+                    if (seenNicsInExcel.contains(nic)) {
+                        System.out.println("⚠️ Skipping row in Excel: Duplicate NIC inside the file -> " + nic);
+                        continue;
+                    }
+                    seenNicsInExcel.add(nic);
+                }
 
                 User user = User.builder()
                         .username(empName)
                         .email(getVal(row, headerMap, "Email"))
                         .password(passwordEncoder.encode("123"))
                         .roles(Set.of(Role.EMPLOYEE))
-                        .nic(getVal(row, headerMap, "National ID"))
+                        .nic(nic)
                         .phoneNumber(getVal(row, headerMap, "Phone Number"))
                         .address(getVal(row, headerMap, "Address"))
                         .dateOfBirth(getDateVal(row, headerMap, "Date Of Birth"))
@@ -61,9 +75,7 @@ public class ExcelService {
                         .dutyPlace(getVal(row, headerMap, "Duty Place"))
                         .salaryScale(getVal(row, headerMap, "Salary Scale"))
                         .dateOfFirstAppointment(getDateVal(row, headerMap, "Date Of First Appointment"))
-
                         .dateOfLanguageProficiency(getDateVal(row, headerMap, "Date Of Language Proficiency"))
-
                         .appointmentDateToPresentStatus(getDateVal(row, headerMap, "Appointment Date To Present Status"))
                         .incrementDate(getDateVal(row, headerMap, "Increment Date"))
                         .dateOfCompulsoryRetirement(getDateVal(row, headerMap, "Date Of Compulsory Retirement"))
@@ -89,16 +101,13 @@ public class ExcelService {
         if (idx == null) return "";
         Cell cell = row.getCell(idx);
         if (cell == null) return "";
-
-        DataFormatter formatter = new DataFormatter();
-        return formatter.formatCellValue(cell);
+        return new DataFormatter().formatCellValue(cell).trim();
     }
 
     private java.time.LocalDate getDateVal(Row row, Map<String, Integer> map, String colName) {
         Integer idx = map.get(colName);
         if (idx == null) return null;
         Cell cell = row.getCell(idx);
-
         if (cell == null) return null;
 
         if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
@@ -108,19 +117,16 @@ public class ExcelService {
         try {
             String val = new DataFormatter().formatCellValue(cell).trim();
             if (!val.isEmpty()) {
-
                 if (val.contains("/")) {
                     java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy");
                     return java.time.LocalDate.parse(val, formatter);
                 }
-
                 return java.time.LocalDate.parse(val);
             }
         } catch (Exception e) {
-            System.err.println("Error parsing date for column [" + colName + "] with value [" + cell + "]: " + e.getMessage());
+            System.err.println("Error parsing date for column [" + colName + "]: " + e.getMessage());
             return null;
         }
-
         return null;
     }
 }

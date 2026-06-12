@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,9 +29,13 @@ import java.util.Map;
 public class PersonalFileController {
 
     private final UserService userService;
+
     private final UserRepository userRepository;
+
     private final PasswordEncoder passwordEncoder;
+
     private final ExcelService excelService;
+
     private final NotificationRepository notificationRepository;
 
     @GetMapping("/me")
@@ -89,7 +94,7 @@ public class PersonalFileController {
 
     @PostMapping("/upload-employees")
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
-    public ResponseEntity<?> uploadEmployees(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadEmployees(@RequestParam("file") MultipartFile file, Authentication authentication) {
 
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("Please select an Excel file.");
@@ -108,26 +113,11 @@ public class PersonalFileController {
                 return ResponseEntity.badRequest().body("No data was found in the Excel file.");
             }
 
-            for (User u : users) {
-                boolean isDuplicate = userRepository.existsByUsernameAndAddressAndNicAndEmailAndPhoneNumberAndDateOfBirth(
-                        u.getUsername(),
-                        u.getAddress(),
-                        u.getNic(),
-                        u.getEmail(),
-                        u.getPhoneNumber(),
-                        u.getDateOfBirth()
-                );
+            String adminEmail = (authentication != null) ? authentication.getName() : "Unknown Admin";
 
-                if (isDuplicate) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body("This employee has already been added to the system! (Name: "
-                                    + u.getUsername() + ", NIC: " + u.getNic() + ")");
-                }
-            }
+            userService.saveOrUpdateExcelEmployees(users, adminEmail);
 
-            userRepository.saveAll(users);
-
-            return ResponseEntity.ok("Employees " + users.size() + " People were successfully added to the system.");
+            return ResponseEntity.ok("Excel process completed successfully! New profiles were added and existing profiles were updated.");
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -189,8 +179,9 @@ public class PersonalFileController {
 
     @GetMapping("/increment-notifications")
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
-    public ResponseEntity<?> getIncrementNotifications() {
-        return ResponseEntity.ok(userService.getAllIncrementNotifications());
+    public ResponseEntity<List<IncrementNotificationResponse>> getIncrementNotifications() {
+        List<IncrementNotificationResponse> responses = userService.getAllIncrementNotifications();
+        return ResponseEntity.ok(responses);
     }
 
     @PutMapping("/update-increment-date/{userId}")
@@ -243,16 +234,40 @@ public class PersonalFileController {
         return ResponseEntity.ok("Increment forms uploaded successfully!");
     }
 
-    @GetMapping("/admin/increment-notifications")
-    @PreAuthorize("hasRole('ROLE_PERSONALFILE_ADMIN')")
-    public ResponseEntity<List<IncrementNotificationResponse>> getAllIncrementNotifications() {
-        List<IncrementNotificationResponse> responses = userService.getAllIncrementNotifications();
-        return ResponseEntity.ok(responses);
-    }
-    
     @PutMapping("/increment-notifications/{id}/approve")
     public ResponseEntity<?> approveIncrement(@PathVariable String id) {
         userService.approveIncrementNotification(id);
         return ResponseEntity.ok().body(Map.of("message", "Increment successfully approved and date updated to next year."));
+    }
+
+    @GetMapping("/increment-notifications/{notificationId}/generate-podu232")
+    public ResponseEntity<Map<String, String>> generatePodu232(@PathVariable String notificationId) {
+        try {
+            String fileUrl = userService.generatePodu232Form(notificationId);
+            Map<String, String> response = new HashMap<>();
+            response.put("fileUrl", fileUrl);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/calculate-increment-leave")
+    public ResponseEntity<Double> getIncrementYearSickLeave(
+            @RequestParam String email,
+            @RequestParam String incrementDate) {
+
+        try {
+            java.time.LocalDate parsedDate = java.time.LocalDate.parse(incrementDate);
+
+            double sickLeaves = userService.calculateSickLeaveForIncrementYear(email, parsedDate);
+
+            return ResponseEntity.ok(sickLeaves);
+        } catch (Exception e) {
+            System.err.println("Error in leave endpoint: " + e.getMessage());
+            return ResponseEntity.ok(0.0);
+        }
     }
 }

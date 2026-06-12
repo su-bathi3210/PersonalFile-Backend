@@ -9,7 +9,6 @@ import java.util.Optional;
 public interface DriverRepository extends MongoRepository<Driver, String> {
     boolean existsByNic(String nic);
     boolean existsByLicenseNumber(String licenseNumber);
-    Optional<Driver> findByEmail(String email);
     Optional<Driver> findByNic(String nic);
     Optional<Driver> findByPhoneNumber(String phoneNumber);
 }

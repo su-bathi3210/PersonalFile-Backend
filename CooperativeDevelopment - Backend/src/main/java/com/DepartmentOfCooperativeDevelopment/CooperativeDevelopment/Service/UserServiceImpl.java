@@ -3,11 +3,19 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.PasswordChangeRequest;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.RegisterRequest;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.*;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Leave.LeaveEntitlement;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.*;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.IncrementNotificationResponse;
 
+import org.bson.Document;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -42,6 +50,44 @@ public class UserServiceImpl implements UserService {
 
     private final String UPLOAD_DIR = "uploads/increment-forms/";
 
+    @Autowired
+    @Qualifier("leaveMongoTemplate")
+    private MongoTemplate leaveTemplate;
+
+    @Override
+    public List<LeaveEntitlement> getSickLeaveEntitlements(String email, int year) {
+        Query query = new Query();
+        String sanitizedEmail = (email != null) ? email.trim().toLowerCase() : "";
+
+        Criteria yearCriteria = new Criteria().orOperator(
+                Criteria.where("year").is(year),
+                Criteria.where("year").is(String.valueOf(year))
+        );
+
+        query.addCriteria(Criteria.where("employeeEmail").is(sanitizedEmail)
+                .and("leaveType").is("SICK")
+                .andOperator(yearCriteria));
+
+        List<Document> rawDocuments = leaveTemplate.find(query, Document.class, "Leave Entitlements");
+
+        return rawDocuments.stream().map(doc -> {
+            double usedDaysValue = 0.0;
+            if (doc.containsKey("usedDays")) {
+                Object obj = doc.get("usedDays");
+                if (obj instanceof Number) {
+                    usedDaysValue = ((Number) obj).doubleValue();
+                }
+            }
+
+            return LeaveEntitlement.builder()
+                    .employeeEmail(doc.getString("employeeEmail"))
+                    .leaveType(doc.getString("leaveType"))
+                    .usedDays(usedDaysValue)
+                    .year(year)
+                    .build();
+        }).toList();
+    }
+
     @Override
     public User registerEmployee(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -52,7 +98,6 @@ public class UserServiceImpl implements UserService {
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .department(request.getDepartment())
                 .roles(Set.of(Role.EMPLOYEE))
                 .build();
 
@@ -71,6 +116,36 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("No employee found."));
 
+        List<String> autoFilledFileUrls = new ArrayList<>();
+
+        String templateSourceDir = "src/main/resources/templates/increment/";
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+
+        double incYearSickLeave = calculateSickLeaveForIncrementYear(user.getEmail(), user.getIncrementDate());
+
+        try {
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            for (String templateName : templateNames) {
+                Path templateFilePath = Paths.get(templateSourceDir + templateName);
+                if (!Files.exists(templateFilePath)) {
+                    continue;
+                }
+
+                String generatedFileName = System.currentTimeMillis() + "_" + user.getUsername() + "_" + templateName;
+                Path targetPath = uploadPath.resolve(generatedFileName);
+
+                generateAutoFilledDocx(templateFilePath, targetPath, user, incYearSickLeave);
+
+                autoFilledFileUrls.add("/" + UPLOAD_DIR + generatedFileName);
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error processing auto-fill templates: " + e.getMessage());
+        }
+
         emailService.sendIncrementReminder(user.getEmail(), user.getUsername(), user.getIncrementDate());
 
         user.setIncrementStatus("EMAIL_SENT");
@@ -78,17 +153,88 @@ public class UserServiceImpl implements UserService {
 
         Notification notification = Notification.builder()
                 .userId(userId)
-                .message("පාලන අංශය විසින් ඔබගේ වැටුප් වර්ධක පෝරම ඉදිරිපත් කරන ලෙස දන්වා ඇත. කරුණාකර අදාළ ලේඛන බාගත කර පුරවා නැවත උඩුගත කරන්න.")
+                .message("පාලන අංශය විසින් ඔබගේ වැටුප් වර්ධක පෝරම ඉදිරිපත් කරන ලෙස දන්වා ඇත. කරුණාකර පහත ස්වයංක්‍රීයව පිරවුණු ලේඛන බාගත කර, ඉතිරි කොටස් පුරවා නැවත උඩුගත කරන්න.") //[cite: 1]
                 .createdAt(LocalDateTime.now())
                 .isIncrementType(true)
                 .read(false)
                 .status("PENDING")
                 .originalIncrementDate(user.getIncrementDate())
                 .requestedTemplates(templateNames)
-                .submittedFileUrls(new ArrayList<>())
+                .submittedFileUrls(autoFilledFileUrls)
                 .build();
 
         notificationRepository.save(notification);
+    }
+
+    private void generateAutoFilledDocx(Path templatePath, Path targetPath, User user, double incYearSickLeave) {
+        try (java.io.InputStream is = Files.newInputStream(templatePath);
+             org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
+             java.io.OutputStream os = Files.newOutputStream(targetPath)) {
+
+            Map<String, String> dataToReplace = new HashMap<>();
+            dataToReplace.put("${employeeName}", user.getUsername() != null ? user.getUsername() : "");
+            dataToReplace.put("${dateOfBirth}", user.getDateOfBirth() != null ? user.getDateOfBirth().toString() : "");
+            dataToReplace.put("${designation}", user.getDesignation() != null ? user.getDesignation() : "");
+            dataToReplace.put("${department}", user.getDepartment() != null ? user.getDepartment() : "");
+            dataToReplace.put("${grade}", user.getGrade() != null ? user.getGrade() : "");
+            dataToReplace.put("${incrementDate}", user.getIncrementDate() != null ? user.getIncrementDate().toString() : "");
+
+            dataToReplace.put("${incrementYearSickUsed}", String.valueOf((int) incYearSickLeave));
+
+            for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : doc.getParagraphs()) {
+                replaceTextInParagraph(p, dataToReplace);
+            }
+
+            for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : doc.getParagraphs()) {
+                List<org.apache.poi.xwpf.usermodel.XWPFRun> runs = p.getRuns();
+                if (runs != null) {
+                    for (org.apache.poi.xwpf.usermodel.XWPFRun r : runs) {
+                        String text = r.getText(0);
+                        if (text != null) {
+                            for (Map.Entry<String, String> entry : dataToReplace.entrySet()) {
+                                if (text.contains(entry.getKey())) {
+                                    text = text.replace(entry.getKey(), entry.getValue());
+                                    r.setText(text, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (org.apache.poi.xwpf.usermodel.XWPFTable tbl : doc.getTables()) {
+                for (org.apache.poi.xwpf.usermodel.XWPFTableRow row : tbl.getRows()) {
+                    for (org.apache.poi.xwpf.usermodel.XWPFTableCell cell : row.getTableCells()) {
+                        for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : cell.getParagraphs()) {
+                            for (org.apache.poi.xwpf.usermodel.XWPFRun r : p.getRuns()) {
+                                String text = r.getText(0);
+                                if (text != null) {
+                                    honestyReplace(r, text, dataToReplace);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            doc.write(os);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write automated fields to Word file: " + e.getMessage());
+        }
+    }
+
+    private void honestyReplace(org.apache.poi.xwpf.usermodel.XWPFRun r, String text, Map<String, String> dataToReplace) {
+        boolean replaced = false;
+        for (Map.Entry<String, String> entry : dataToReplace.entrySet()) {
+            if (text.contains(entry.getKey())) {
+                text = text.replace(entry.getKey(), entry.getValue());
+                replaced = true;
+            }
+        }
+        if (replaced) {
+            r.setText(text, 0);
+        }
     }
 
     @Override
@@ -137,6 +283,33 @@ public class UserServiceImpl implements UserService {
                     User user = userRepository.findById(notification.getUserId()).orElse(null);
                     if (user == null) return null;
 
+                    int currentYear = 2026;
+                    if (notification.getCreatedAt() != null) {
+                        currentYear = notification.getCreatedAt().getYear();
+                        if (currentYear < 1900) {
+                            currentYear = java.time.LocalDate.now().getYear();
+                        }
+                    } else {
+                        currentYear = java.time.LocalDate.now().getYear();
+                    }
+                    int oldYear = currentYear - 1;
+
+                    String employeeEmail = user.getEmail() != null ? user.getEmail().trim().toLowerCase() : "";
+
+                    double currentSickUsed = 0.0;
+                    List<LeaveEntitlement> currentEntitlements = getSickLeaveEntitlements(employeeEmail, currentYear);
+                    if (currentEntitlements != null && !currentEntitlements.isEmpty()) {
+                        currentSickUsed = currentEntitlements.get(0).getUsedDays();
+                    }
+
+                    double oldSickUsed = 0.0;
+                    List<LeaveEntitlement> oldEntitlements = getSickLeaveEntitlements(employeeEmail, oldYear);
+                    if (oldEntitlements != null && !oldEntitlements.isEmpty()) {
+                        oldSickUsed = oldEntitlements.get(0).getUsedDays();
+                    }
+
+                    double incYearSickUsed = calculateSickLeaveForIncrementYear(employeeEmail, user.getIncrementDate());
+
                     return IncrementNotificationResponse.builder()
                             .notificationId(notification.getId())
                             .userId(user.getId())
@@ -150,10 +323,15 @@ public class UserServiceImpl implements UserService {
                             .submittedDate(notification.getSubmittedAt())
                             .requestedTemplates(notification.getRequestedTemplates())
                             .submittedFileUrls(notification.getSubmittedFileUrls())
+
+                            .oldYearSickUsed(oldSickUsed)
+                            .currentYearSickUsed(currentSickUsed)
+
+                            .incrementYearSickUsed(incYearSickUsed)
                             .build();
                 })
-                .filter(Objects::nonNull)
-                .sorted(Comparator.comparing(IncrementNotificationResponse::getSentDate).reversed())
+                .filter(java.util.Objects::nonNull)
+                .sorted(java.util.Comparator.comparing(IncrementNotificationResponse::getSentDate).reversed())
                 .toList();
     }
 
@@ -497,5 +675,282 @@ public class UserServiceImpl implements UserService {
         notification.setStatus("APPROVED");
         notification.setRead(true);
         notificationRepository.save(notification);
+    }
+
+    @Override
+    @Transactional
+    public String generatePodu232Form(String notificationId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found."));
+
+        User user = userRepository.findById(notification.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found for this notification."));
+
+        int currentYear = 2026;
+        if (notification.getCreatedAt() != null) {
+            currentYear = notification.getCreatedAt().getYear();
+            if (currentYear < 1900) {
+                currentYear = java.time.LocalDate.now().getYear();
+            }
+        } else {
+            currentYear = java.time.LocalDate.now().getYear();
+        }
+        int oldYear = currentYear - 1;
+
+        String employeeEmail = user.getEmail() != null ? user.getEmail().trim().toLowerCase() : "";
+
+        double currentSickUsed = 0.0;
+        List<LeaveEntitlement> currentEntitlements = getSickLeaveEntitlements(employeeEmail, currentYear);
+        if (currentEntitlements != null && !currentEntitlements.isEmpty()) {
+            currentSickUsed = currentEntitlements.get(0).getUsedDays();
+        }
+
+        double oldSickUsed = 0.0;
+        List<LeaveEntitlement> oldEntitlements = getSickLeaveEntitlements(employeeEmail, oldYear);
+        if (oldEntitlements != null && !oldEntitlements.isEmpty()) {
+            oldSickUsed = oldEntitlements.get(0).getUsedDays();
+        }
+
+        String templateSourceDir = "src/main/resources/templates/increment/";
+        String templateName = "පොදු 232 ආකෘතිය.docx";
+        Path templateFilePath = Paths.get(templateSourceDir + templateName);
+
+        if (!Files.exists(templateFilePath)) {
+            throw new RuntimeException("Template file 'පොදු 232 ආකෘතිය.docx' not found.");
+        }
+
+        String generatedFileName = System.currentTimeMillis() + "_" + user.getUsername() + "පොදු 232 ආකෘතිය.docx";
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+        Path targetPath = uploadPath.resolve(generatedFileName);
+
+        try {
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            generateAutoFilledDocxWithLeave(templateFilePath, targetPath, user, oldSickUsed, currentSickUsed);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error generating Podu 232 Form: " + e.getMessage());
+        }
+
+        return "/" + UPLOAD_DIR + generatedFileName;
+    }
+
+    private void generateAutoFilledDocxWithLeave(Path templatePath, Path targetPath, User user, double oldLeave, double currentLeave) {
+        try (java.io.InputStream is = Files.newInputStream(templatePath);
+             org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
+             java.io.OutputStream os = Files.newOutputStream(targetPath)) {
+
+            Map<String, String> dataToReplace = new HashMap<>();
+            dataToReplace.put("${employeeName}", user.getUsername() != null ? user.getUsername() : "");
+            dataToReplace.put("${dateOfBirth}", user.getDateOfBirth() != null ? user.getDateOfBirth().toString() : "");
+            dataToReplace.put("${designation}", user.getDesignation() != null ? user.getDesignation() : "");
+            dataToReplace.put("${department}", user.getDepartment() != null ? user.getDepartment() : "");
+            dataToReplace.put("${grade}", user.getGrade() != null ? user.getGrade() : "");
+            dataToReplace.put("${incrementDate}", user.getIncrementDate() != null ? user.getIncrementDate().toString() : "");
+
+            dataToReplace.put("${oldYearSickUsed}", String.valueOf((int) oldLeave));
+            dataToReplace.put("${currentYearSickUsed}", String.valueOf((int) currentLeave));
+
+            for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : doc.getParagraphs()) {
+                replaceTextInParagraph(p, dataToReplace);
+            }
+
+            for (org.apache.poi.xwpf.usermodel.XWPFTable tbl : doc.getTables()) {
+                for (org.apache.poi.xwpf.usermodel.XWPFTableRow row : tbl.getRows()) {
+                    for (org.apache.poi.xwpf.usermodel.XWPFTableCell cell : row.getTableCells()) {
+                        for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : cell.getParagraphs()) {
+                            replaceTextInParagraph(p, dataToReplace);
+                        }
+                    }
+                }
+            }
+
+            for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : doc.getParagraphs()) {
+                for (org.apache.xmlbeans.XmlObject xObj : p.getCTP().selectPath(
+                        "declare namespace w='http://schemas.openxmlformats.org/wordprocessingml/2006/main' " +
+                                "declare namespace wps='http://schemas.microsoft.com/office/word/2010/wordprocessingShape' " +
+                                ".//wps:txbx//w:p")) {
+                    try {
+                        org.apache.poi.xwpf.usermodel.XWPFParagraph shapeParagraph = new org.apache.poi.xwpf.usermodel.XWPFParagraph(
+                                org.openxmlformats.schemas.wordprocessingml.x2006.main.CTP.Factory.parse(xObj.xmlText()), p.getBody());
+                        replaceTextInParagraph(shapeParagraph, dataToReplace);
+                        xObj.set(shapeParagraph.getCTP());
+                    } catch (Exception e) {
+                        System.err.println("Error parsing shape text box: " + e.getMessage());
+                    }
+                }
+            }
+
+            doc.write(os);
+
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write automated fields to Word file: " + e.getMessage());
+        }
+    }
+
+    private void replaceTextInParagraph(org.apache.poi.xwpf.usermodel.XWPFParagraph p, Map<String, String> dataToReplace) {
+        String paragraphText = p.getParagraphText();
+        if (paragraphText == null || paragraphText.isEmpty()) return;
+
+        boolean needReplacement = false;
+        for (String key : dataToReplace.keySet()) {
+            if (paragraphText.contains(key)) {
+                needReplacement = true;
+                break;
+            }
+        }
+
+        if (needReplacement && p.getRuns() != null && !p.getRuns().isEmpty()) {
+            StringBuilder fullTextBuilder = new StringBuilder();
+            for (org.apache.poi.xwpf.usermodel.XWPFRun r : p.getRuns()) {
+                String text = r.getText(0);
+                if (text != null) fullTextBuilder.append(text);
+            }
+
+            String combinedText = fullTextBuilder.toString();
+            for (Map.Entry<String, String> entry : dataToReplace.entrySet()) {
+                if (combinedText.contains(entry.getKey())) {
+                    combinedText = combinedText.replace(entry.getKey(), entry.getValue());
+                }
+            }
+
+            int runSize = p.getRuns().size();
+            for (int i = runSize - 1; i > 0; i--) {
+                p.removeRun(i);
+            }
+            if (!p.getRuns().isEmpty()) {
+                p.getRuns().get(0).setText(combinedText, 0);
+            }
+        }
+    }
+
+    @Override
+    public double calculateSickLeaveForIncrementYear(String email, java.time.LocalDate incrementDate) {
+        if (incrementDate == null || email == null || email.isEmpty()) {
+            return 0.0;
+        }
+
+        java.time.LocalDate endDate = incrementDate;
+        java.time.LocalDate startDate = incrementDate.minusYears(1);
+
+        int startYear = startDate.getYear();
+        int endYear = endDate.getYear();
+
+        String sanitizedEmail = email.trim().toLowerCase();
+        Query query = new Query();
+        query.addCriteria(Criteria.where("employeeEmail").is(sanitizedEmail).and("leaveType").is("SICK"));
+
+        List<Document> rawDocuments = leaveTemplate.find(query, Document.class, "Leave Entitlements");
+
+        double totalSickDaysInIncrementYear = 0.0;
+        java.time.format.DateTimeFormatter simpleFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        for (Document doc : rawDocuments) {
+            Object yearObj = doc.get("year");
+            int docYear = 0;
+            if (yearObj instanceof Number) {
+                docYear = ((Number) yearObj).intValue();
+            } else if (yearObj instanceof String) {
+                docYear = Integer.parseInt((String) yearObj);
+            }
+
+            if (docYear != startYear && docYear != endYear) {
+                continue;
+            }
+
+            Document monthlyUsage = (Document) doc.get("monthlyUsage");
+            if (monthlyUsage == null) continue;
+
+            for (String monthKey : monthlyUsage.keySet()) {
+                Document monthDoc = (Document) monthlyUsage.get(monthKey);
+                if (monthDoc == null) continue;
+
+                Document sickDoc = (Document) monthDoc.get("SICK");
+                if (sickDoc == null) continue;
+
+                List<?> datesList = (List<?>) sickDoc.get("dates");
+                if (datesList == null) continue;
+
+                for (Object dateObj : datesList) {
+                    String dateStr = (dateObj != null) ? dateObj.toString().trim() : "";
+                    if (dateStr.isEmpty()) continue;
+
+                    try {
+                        if (dateStr.contains("~")) {
+                            String[] parts = dateStr.split("~");
+                            String firstDateStr = parts[0].trim();
+
+                            String secondPart = parts[1].trim();
+                            String[] subParts = secondPart.split("\\(");
+                            String secondDateStr = subParts[0].trim();
+
+                            double days = 0.0;
+                            if (subParts.length > 1) {
+                                String daysStr = subParts[1].replace("d)", "").trim();
+                                days = Double.parseDouble(daysStr);
+                            }
+
+                            java.time.LocalDate leaveStart = java.time.LocalDate.parse(firstDateStr, simpleFormatter);
+                            java.time.LocalDate leaveEnd = java.time.LocalDate.parse(secondDateStr, simpleFormatter);
+
+                            if ((leaveStart.isAfter(startDate) || leaveStart.isEqual(startDate)) &&
+                                    (leaveEnd.isBefore(endDate) || leaveEnd.isEqual(endDate))) {
+                                totalSickDaysInIncrementYear += days;
+                            }
+
+                        } else if (dateStr.contains("(")) {
+                            String[] parts = dateStr.split("\\(");
+                            String exactDateStr = parts[0].trim();
+
+                            double days = 0.0;
+                            if (parts.length > 1) {
+                                String daysStr = parts[1].replace("d)", "").trim();
+                                days = Double.parseDouble(daysStr);
+                            }
+
+                            java.time.LocalDate leaveDate = java.time.LocalDate.parse(exactDateStr, simpleFormatter);
+
+                            if ((leaveDate.isAfter(startDate) || leaveDate.isEqual(startDate)) &&
+                                    (leaveDate.isBefore(endDate) || leaveDate.isEqual(endDate))) {
+                                totalSickDaysInIncrementYear += days;
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error parsing leave date string: " + dateStr + " - " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        return totalSickDaysInIncrementYear;
+    }
+
+
+    @Override
+    @Transactional
+    public void saveOrUpdateExcelEmployees(List<User> excelUsers, String adminEmail) {
+        for (User excelUser : excelUsers) {
+            if (excelUser.getNic() == null || excelUser.getNic().isEmpty()) {
+                continue;
+            }
+
+            Optional<User> existingUserOpt = userRepository.findByNic(excelUser.getNic());
+
+            if (existingUserOpt.isPresent()) {
+                User existingUser = existingUserOpt.get();
+
+                excelUser.setPassword(existingUser.getPassword());
+                excelUser.setRoles(existingUser.getRoles());
+
+                var authorities = List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_PERSONALFILE_ADMIN"));
+
+                this.updatePersonalFile(existingUser.getId(), excelUser, "EXCEL_BULK_UPLOAD (" + adminEmail + ")", authorities);
+
+            } else {
+                userRepository.save(excelUser);
+            }
+        }
     }
 }

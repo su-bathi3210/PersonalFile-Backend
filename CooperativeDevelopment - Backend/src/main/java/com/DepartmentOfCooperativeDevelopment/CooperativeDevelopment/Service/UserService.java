@@ -32,5 +32,9 @@ public interface UserService {
     void sendIncrementNotification(String userId, List<String> templateNames);
     void uploadSubmittedForms(String notificationId, List<MultipartFile> files);
     void approveIncrementNotification(String notificationId);
+    String generatePodu232Form(String notificationId);
+    void saveOrUpdateExcelEmployees(List<User> excelUsers, String adminEmail);
+    double calculateSickLeaveForIncrementYear(String email, java.time.LocalDate incrementDate);
     void updatePersonalFile(String email, User updateData, String currentUserEmail, Collection<? extends GrantedAuthority> authorities);
+    List<com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Leave.LeaveEntitlement> getSickLeaveEntitlements(String email, int year);
 }

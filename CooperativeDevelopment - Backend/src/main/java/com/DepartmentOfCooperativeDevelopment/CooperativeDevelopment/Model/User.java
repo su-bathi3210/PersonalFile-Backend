@@ -3,7 +3,9 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.annotation.Transient;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -26,7 +28,10 @@ public class User {
     private Set<Role> roles;
 
     private String email;
+
+    @Indexed(unique = true)
     private String nic;
+    
     private String address;
     private LocalDate dateOfBirth;
     private String gender;
@@ -56,6 +61,5 @@ public class User {
     private LocalDate dateOfReceiptGradeIII;
 
     private String incrementStatus;
-
     private Map<String, Object> dynamicFields = new HashMap<>();
 }

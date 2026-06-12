@@ -22,6 +22,11 @@ public class IncrementNotificationResponse {
     private LocalDateTime sentDate;
     private LocalDateTime submittedDate;
 
+    private double oldYearSickUsed;    
+    private double currentYearSickUsed;
+
+    private double incrementYearSickUsed;
+
     private List<String> requestedTemplates;
     private List<String> submittedFileUrls;
 }

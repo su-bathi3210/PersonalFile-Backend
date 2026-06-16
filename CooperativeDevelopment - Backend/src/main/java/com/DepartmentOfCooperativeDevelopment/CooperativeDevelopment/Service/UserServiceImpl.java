@@ -117,8 +117,6 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new RuntimeException("No employee found."));
 
         List<String> autoFilledFileUrls = new ArrayList<>();
-
-        String templateSourceDir = "src/main/resources/templates/increment/";
         Path uploadPath = Paths.get(UPLOAD_DIR);
 
         double incYearSickLeave = calculateSickLeaveForIncrementYear(user.getEmail(), user.getIncrementDate());
@@ -129,15 +127,20 @@ public class UserServiceImpl implements UserService {
             }
 
             for (String templateName : templateNames) {
-                Path templateFilePath = Paths.get(templateSourceDir + templateName);
-                if (!Files.exists(templateFilePath)) {
+                org.springframework.core.io.ClassPathResource resource =
+                        new org.springframework.core.io.ClassPathResource("templates/increment/" + templateName);
+
+                if (!resource.exists()) {
+                    System.err.println("Template not found inside jar resources: " + templateName);
                     continue;
                 }
 
                 String generatedFileName = System.currentTimeMillis() + "_" + user.getUsername() + "_" + templateName;
                 Path targetPath = uploadPath.resolve(generatedFileName);
 
-                generateAutoFilledDocx(templateFilePath, targetPath, user, incYearSickLeave);
+                try (java.io.InputStream is = resource.getInputStream()) {
+                    generateAutoFilledDocx(is, targetPath, user, incYearSickLeave);
+                }
 
                 autoFilledFileUrls.add("/" + UPLOAD_DIR + generatedFileName);
             }
@@ -153,7 +156,7 @@ public class UserServiceImpl implements UserService {
 
         Notification notification = Notification.builder()
                 .userId(userId)
-                .message("පාලන අංශය විසින් ඔබගේ වැටුප් වර්ධක පෝරම ඉදිරිපත් කරන ලෙස දන්වා ඇත. කරුණාකර පහත ස්වයංක්‍රීයව පිරවුණු ලේඛන බාගත කර, ඉතිරි කොටස් පුරවා නැවත උඩුගත කරන්න.") //[cite: 1]
+                .message("පාලන අංශය විසින් ඔබගේ වැටුප් වර්ධක පෝරම ඉදිරිපත් කරන ලෙස දන්වා ඇත. කරුණාකර පහත ස්වයංක්‍රීයව පිරවුණු ලේඛන බාගත කර, ඉතිරි කොටස් පුරවා නැවත උඩුගත කරන්න.")
                 .createdAt(LocalDateTime.now())
                 .isIncrementType(true)
                 .read(false)
@@ -166,9 +169,8 @@ public class UserServiceImpl implements UserService {
         notificationRepository.save(notification);
     }
 
-    private void generateAutoFilledDocx(Path templatePath, Path targetPath, User user, double incYearSickLeave) {
-        try (java.io.InputStream is = Files.newInputStream(templatePath);
-             org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
+    private void generateAutoFilledDocx(java.io.InputStream is, Path targetPath, User user, double incYearSickLeave) {
+        try (org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
              java.io.OutputStream os = Files.newOutputStream(targetPath)) {
 
             Map<String, String> dataToReplace = new HashMap<>();
@@ -711,12 +713,11 @@ public class UserServiceImpl implements UserService {
             oldSickUsed = oldEntitlements.get(0).getUsedDays();
         }
 
-        String templateSourceDir = "src/main/resources/templates/increment/";
-        String templateName = "පොදු 232 ආකෘතිය.docx";
-        Path templateFilePath = Paths.get(templateSourceDir + templateName);
+        org.springframework.core.io.ClassPathResource resource =
+                new org.springframework.core.io.ClassPathResource("templates/increment/පොදු 232 ආකෘතිය.docx");
 
-        if (!Files.exists(templateFilePath)) {
-            throw new RuntimeException("Template file 'පොදු 232 ආකෘතිය.docx' not found.");
+        if (!resource.exists()) {
+            throw new RuntimeException("Template file 'පොදු 232 ආකෘතිය.docx' not found inside resources path.");
         }
 
         String generatedFileName = System.currentTimeMillis() + "_" + user.getUsername() + "පොදු 232 ආකෘතිය.docx";
@@ -728,7 +729,9 @@ public class UserServiceImpl implements UserService {
                 Files.createDirectories(uploadPath);
             }
 
-            generateAutoFilledDocxWithLeave(templateFilePath, targetPath, user, oldSickUsed, currentSickUsed);
+            try (java.io.InputStream is = resource.getInputStream()) {
+                generateAutoFilledDocxWithLeave(is, targetPath, user, oldSickUsed, currentSickUsed);
+            }
 
         } catch (IOException e) {
             throw new RuntimeException("Error generating Podu 232 Form: " + e.getMessage());
@@ -737,9 +740,8 @@ public class UserServiceImpl implements UserService {
         return "/" + UPLOAD_DIR + generatedFileName;
     }
 
-    private void generateAutoFilledDocxWithLeave(Path templatePath, Path targetPath, User user, double oldLeave, double currentLeave) {
-        try (java.io.InputStream is = Files.newInputStream(templatePath);
-             org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
+    private void generateAutoFilledDocxWithLeave(java.io.InputStream is, Path targetPath, User user, double oldLeave, double currentLeave) {
+        try (org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
              java.io.OutputStream os = Files.newOutputStream(targetPath)) {
 
             Map<String, String> dataToReplace = new HashMap<>();

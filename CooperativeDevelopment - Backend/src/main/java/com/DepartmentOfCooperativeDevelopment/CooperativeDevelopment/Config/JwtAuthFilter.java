@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.hibernate.validator.internal.util.stereotypes.Lazy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Config.JwtUtil;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

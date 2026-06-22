@@ -28,5 +28,6 @@ public class IncrementNotificationResponse {
     private double incrementYearSickUsed;
 
     private List<String> requestedTemplates;
+    private List<String> generatedFileUrls;
     private List<String> submittedFileUrls;
 }

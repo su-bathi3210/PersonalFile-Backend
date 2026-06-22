@@ -7,11 +7,11 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "VehicleApprovalOfficerConfigs")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Document(collection = "VehicleApprovalOfficerConfigs")
 public class VehicleApprovalOfficerConfig {
     @Id
     private String id = "VEHICLE_APPROVAL_OFFICER_SETTINGS";

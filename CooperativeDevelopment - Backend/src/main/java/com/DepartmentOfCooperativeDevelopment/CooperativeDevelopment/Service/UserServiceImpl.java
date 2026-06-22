@@ -163,7 +163,8 @@ public class UserServiceImpl implements UserService {
                 .status("PENDING")
                 .originalIncrementDate(user.getIncrementDate())
                 .requestedTemplates(templateNames)
-                .submittedFileUrls(autoFilledFileUrls)
+                .generatedFileUrls(autoFilledFileUrls)
+                .submittedFileUrls(new ArrayList<>())
                 .build();
 
         notificationRepository.save(notification);

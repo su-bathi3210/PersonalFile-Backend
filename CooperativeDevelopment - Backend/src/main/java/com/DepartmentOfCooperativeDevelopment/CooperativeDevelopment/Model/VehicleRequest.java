@@ -8,10 +8,10 @@ import org.springframework.data.mongodb.core.mapping.DBRef;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.util.Date;
 
-@Document(collection = "VehicleRequests")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Document(collection = "VehicleRequests")
 public class VehicleRequest {
     @Id
     private String id;

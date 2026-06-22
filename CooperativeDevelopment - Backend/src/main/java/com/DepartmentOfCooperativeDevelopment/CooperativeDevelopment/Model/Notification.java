@@ -26,6 +26,7 @@ public class Notification {
     private String status;
 
     private List<String> requestedTemplates;
+    private List<String> generatedFileUrls;
     private List<String> submittedFileUrls;
     private LocalDateTime submittedAt;
 }

@@ -270,4 +270,21 @@ public class PersonalFileController {
             return ResponseEntity.ok(0.0);
         }
     }
+
+    @DeleteMapping("/increment-notifications/{id}/cancel")
+    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
+    public ResponseEntity<?> cancelIncrementNotification(@PathVariable String id) {
+        try {
+            if (!notificationRepository.existsById(id)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "Increment notification not found."));
+            }
+
+            notificationRepository.deleteById(id);
+            return ResponseEntity.ok().body(Map.of("message", "Increment request cancelled successfully."));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Failed to cancel request: " + e.getMessage()));
+        }
+    }
 }

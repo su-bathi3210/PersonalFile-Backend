@@ -48,7 +48,7 @@ public class VehicleRequestController {
     }
 
     @PutMapping("/{id}/approve")
-    @PreAuthorize("hasRole('VEHICLE_ADMIN')") 
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
     public ResponseEntity<VehicleRequest> approveRequest(
             @PathVariable String id,
             @RequestBody VehicleApprovalDTO approvalDTO) {
@@ -137,5 +137,88 @@ public class VehicleRequestController {
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(null);
         }
+    }
+
+    @PutMapping("/{requestId}/cancel")
+    public ResponseEntity<?> cancelRequestByEmployee(
+            @PathVariable String requestId,
+            java.security.Principal principal) {
+        try {
+            if (principal == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User cannot be identified.");
+            }
+
+            String employeeEmail = principal.getName();
+            VehicleRequest cancelledRequest = vehicleRequestService.cancelRequestByEmployee(requestId, employeeEmail);
+
+            return ResponseEntity.ok(cancelledRequest);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PutMapping("/admin-email")
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
+    public ResponseEntity<String> updateAdminEmail(@RequestParam String email) {
+        vehicleRequestService.updateVehicleAdminEmail(email);
+        return ResponseEntity.ok("Vehicle Admin email updated successfully.");
+    }
+
+    @GetMapping("/admin-email")
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
+    public ResponseEntity<String> getAdminEmail() {
+        String email = vehicleRequestService.getVehicleAdminEmail();
+        return ResponseEntity.ok(email);
+    }
+
+    @PutMapping("/officer-email")
+    @PreAuthorize("hasRole('VEHICLE_APPROVAL')")
+    public ResponseEntity<String> updateOfficerEmail(@RequestParam String email) {
+        vehicleRequestService.updateVehicleApprovalOfficerEmail(email);
+        return ResponseEntity.ok("Vehicle Approval Officer email updated successfully.");
+    }
+
+    @GetMapping("/officer-email")
+    @PreAuthorize("hasRole('VEHICLE_APPROVAL')")
+    public ResponseEntity<String> getOfficerEmail() {
+        String email = vehicleRequestService.getVehicleApprovalOfficerEmail();
+        return ResponseEntity.ok(email);
+    }
+
+    @GetMapping("/admin/pending-count")
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
+    public ResponseEntity<Long> getPendingRequestsCount() {
+        long count = vehicleRequestService.getPendingRequestsCountForAdmin();
+        return ResponseEntity.ok(count);
+    }
+
+    @GetMapping("/admin/officer-approved-count")
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
+    public ResponseEntity<Long> getOfficerApprovedRequestsCount() {
+        long count = vehicleRequestService.getOfficerApprovedRequestsCountForAdmin();
+        return ResponseEntity.ok(count);
+    }
+
+    @GetMapping("/today")
+    public ResponseEntity<List<VehicleRequest>> getTodayRequests() {
+        List<VehicleRequest> todayRequests = vehicleRequestService.getTodayVehicleRequests();
+        return ResponseEntity.ok(todayRequests);
+    }
+
+    @PostMapping("/admin/send-today-trips-email")
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
+    public ResponseEntity<String> sendTodayTripsEmail() {
+        try {
+            vehicleRequestService.sendTodayTripsToAdmin();
+            return ResponseEntity.ok("අද දවසේ Trips ලැයිස්තුව Admin වෙත සාර්ථකව Email කරන ලදී.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/start-trip/{id}")
+    public ResponseEntity<VehicleRequest> startTrip(@PathVariable String id) {
+        VehicleRequest startedRequest = vehicleRequestService.startTrip(id);
+        return ResponseEntity.ok(startedRequest);
     }
 }

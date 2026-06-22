@@ -5,8 +5,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDate;
+import java.util.List;
 
 @Document(collection = "Vehicles")
 @Data
@@ -15,6 +17,10 @@ import java.time.LocalDate;
 @Builder
 public class Vehicle {
     @Id
+
+    @Transient
+    private List<VehicleServiceRecord> serviceHistorySummary;
+
     private String id;
     private String vehicleNumber;
     private String vehicleType;
@@ -24,4 +30,6 @@ public class Vehicle {
     private String licenseNumber;
     private LocalDate licenseIssueDate;
     private LocalDate licenseExpiryDate;
+    private Double currentKm = 0.0;
+    private Double nextServiceDueDateKm;
 }

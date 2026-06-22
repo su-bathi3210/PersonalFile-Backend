@@ -12,4 +12,5 @@ public class VehicleDTO {
     private String licenseNumber;
     private LocalDate licenseIssueDate;
     private LocalDate licenseExpiryDate;
+    private Double currentKm;
 }

@@ -21,5 +21,15 @@ public interface VehicleRequestService {
     List<VehicleRequest> getDriverDashboardTrips(String driverPhoneNumber);
     List<VehicleRequest> getDriverDashboardTripsByNic(String nic);
     VehicleRequest endVehicleTrip(String requestId);
+    VehicleRequest cancelRequestByEmployee(String requestId, String employeeEmail);
+    void updateVehicleAdminEmail(String email);
+    String getVehicleAdminEmail();
+    void updateVehicleApprovalOfficerEmail(String email);
+    String getVehicleApprovalOfficerEmail();
+    long getPendingRequestsCountForAdmin();
+    long getOfficerApprovedRequestsCountForAdmin();
+    List<VehicleRequest> getTodayVehicleRequests();
+    void sendTodayTripsToAdmin();
+    VehicleRequest startTrip(String id);
     VehicleRequest approveVehicleRequest(String requestId, VehicleApprovalDTO approvalDTO);
 }

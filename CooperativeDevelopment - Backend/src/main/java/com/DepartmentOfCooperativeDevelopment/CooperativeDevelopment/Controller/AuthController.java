@@ -25,7 +25,9 @@ import java.util.stream.Collectors;
 public class AuthController {
 
     private final AuthenticationManager authenticationManager;
+
     private final JwtUtil jwtUtil;
+
     private final UserService userService;
 
     @PostMapping("/login")

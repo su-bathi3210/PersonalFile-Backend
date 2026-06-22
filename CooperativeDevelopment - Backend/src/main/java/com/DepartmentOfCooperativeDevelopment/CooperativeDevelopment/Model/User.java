@@ -37,6 +37,9 @@ public class User {
     private String gender;
     private String phoneNumber;
 
+    private String emergencyContact;
+    private String salary;
+
     private String serviceNumber;
     private LocalDate dateOfLanguageProficiency;
 

@@ -4,6 +4,9 @@ import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Reque
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.VehicleRequest;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 
 @Repository
@@ -12,4 +15,6 @@ public interface VehicleRequestRepository extends MongoRepository<VehicleRequest
     List<VehicleRequest> findByRequesterEmail(String requesterEmail);
     List<VehicleRequest> findByAssignedDriverIdAndStatus(String driverId, RequestStatus status);
     List<VehicleRequest> findByAssignedDriverId(String driverId);
+    long countByStatus(RequestStatus status);
+    List<VehicleRequest> findByTravelDateTimeBetween(Date start, Date end);
 }

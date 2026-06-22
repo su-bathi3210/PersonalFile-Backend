@@ -354,6 +354,7 @@ public class UserServiceImpl implements UserService {
         compareAndAdd(fieldChanges, "address", userToUpdate.getAddress(), updateData.getAddress());
         compareAndAdd(fieldChanges, "phoneNumber", userToUpdate.getPhoneNumber(), updateData.getPhoneNumber());
         compareAndAdd(fieldChanges, "profileImage", userToUpdate.getProfileImage(), updateData.getProfileImage());
+        compareAndAdd(fieldChanges, "emergencyContact", userToUpdate.getEmergencyContact(), updateData.getEmergencyContact());
         compareAndAdd(fieldChanges, "gender", userToUpdate.getGender(), updateData.getGender());
         compareAndAdd(fieldChanges, "dateOfBirth",
                 userToUpdate.getDateOfBirth() != null ? userToUpdate.getDateOfBirth().toString() : null,
@@ -367,6 +368,7 @@ public class UserServiceImpl implements UserService {
             compareAndAdd(fieldChanges, "dutyPlace", userToUpdate.getDutyPlace(), updateData.getDutyPlace());
             compareAndAdd(fieldChanges, "grade", userToUpdate.getGrade(), updateData.getGrade());
             compareAndAdd(fieldChanges, "salaryScale", userToUpdate.getSalaryScale(), updateData.getSalaryScale());
+            compareAndAdd(fieldChanges, "salary", userToUpdate.getSalary(), updateData.getSalary());
 
             compareAndAdd(fieldChanges, "dateOfLanguageProficiency",
                     userToUpdate.getDateOfLanguageProficiency() != null ? userToUpdate.getDateOfLanguageProficiency().toString() : null,
@@ -472,6 +474,7 @@ public class UserServiceImpl implements UserService {
         userToUpdate.setNic(updateData.getNic());
         userToUpdate.setAddress(updateData.getAddress());
         userToUpdate.setPhoneNumber(updateData.getPhoneNumber());
+        userToUpdate.setEmergencyContact(updateData.getEmergencyContact());
         userToUpdate.setProfileImage(updateData.getProfileImage());
         userToUpdate.setGender(updateData.getGender());
         userToUpdate.setDateOfBirth(updateData.getDateOfBirth());
@@ -485,6 +488,7 @@ public class UserServiceImpl implements UserService {
             userToUpdate.setGrade(updateData.getGrade());
             userToUpdate.setDateOfLanguageProficiency(updateData.getDateOfLanguageProficiency());
             userToUpdate.setSalaryScale(updateData.getSalaryScale());
+            userToUpdate.setSalary(updateData.getSalary());
             userToUpdate.setDateOfFirstAppointment(updateData.getDateOfFirstAppointment());
             userToUpdate.setAppointmentDateToPresentStatus(updateData.getAppointmentDateToPresentStatus());
             userToUpdate.setIncrementDate(updateData.getIncrementDate());

@@ -1,7 +1,5 @@
 package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Config;
 
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Config.JwtAuthFilter;
-import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -55,7 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/dynamic-fields/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")
 
                         .requestMatchers("/drivers/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE", "DRIVER")
-                        .requestMatchers("/vehicles/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE")
+                        .requestMatchers("/vehicles/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE", "DRIVER")
 
                         .requestMatchers("/increment-form/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")
 

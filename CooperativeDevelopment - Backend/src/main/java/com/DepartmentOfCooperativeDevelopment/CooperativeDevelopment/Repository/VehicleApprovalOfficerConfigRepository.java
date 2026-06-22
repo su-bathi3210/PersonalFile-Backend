@@ -1,0 +1,8 @@
+package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository;
+
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.VehicleApprovalOfficerConfig;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface VehicleApprovalOfficerConfigRepository extends MongoRepository<VehicleApprovalOfficerConfig, String> { }

@@ -46,4 +46,33 @@ public class DriverController {
         List<VehicleRequest> trips = vehicleRequestService.getDriverDashboardTripsByNic(driverNic);
         return ResponseEntity.ok(trips);
     }
+
+    @PutMapping("/update/{id}")
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
+    public ResponseEntity<?> updateDriver(@PathVariable String id, @RequestBody DriverDTO driverDTO) {
+        try {
+            Driver updatedDriver = driverService.updateDriver(id, driverDTO);
+            return ResponseEntity.ok(updatedDriver);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/delete/{id}")
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
+    public ResponseEntity<?> deleteDriver(@PathVariable String id) {
+        try {
+            driverService.deleteDriver(id);
+            return ResponseEntity.ok("Driver and associated user account deleted successfully.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/count")
+    @PreAuthorize("hasRole('VEHICLE_ADMIN')")
+    public ResponseEntity<Long> getDriversCount() {
+        long count = driverService.getAllDrivers().size();
+        return ResponseEntity.ok(count);
+    }
 }

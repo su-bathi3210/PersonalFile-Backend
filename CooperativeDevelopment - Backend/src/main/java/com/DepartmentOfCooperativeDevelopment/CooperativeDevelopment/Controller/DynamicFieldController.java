@@ -1,14 +1,20 @@
 package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Controller;
 
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.DynamicField;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Role;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.DynamicFieldRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.UserRepository;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service.UserService; // 👈 අලුතින් එකතු කළා
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/dynamic-fields")
@@ -19,13 +25,15 @@ public class DynamicFieldController {
 
     private final UserRepository userRepository;
 
+    private final UserService userService;
+
     @PostMapping("/add")
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
     public ResponseEntity<?> addField(@RequestBody DynamicField dynamicField) {
         if (dynamicFieldRepository.existsByFieldKey(dynamicField.getFieldKey())) {
             return ResponseEntity.badRequest().body("Error: Field key already exists!");
         }
-        return ResponseEntity.ok(dynamicFieldRepository.save(dynamicField));
+        return ResponseEntity.ok(userService.createDynamicField(dynamicField));
     }
 
     @PutMapping("/update/{id}")
@@ -39,8 +47,10 @@ public class DynamicFieldController {
         config.setRequired(updateData.isRequired());
         config.setGlobal(updateData.isGlobal());
         config.setEmployeeEmail(updateData.isGlobal() ? "" : updateData.getEmployeeEmail());
-
         config.setAdminOnly(updateData.isAdminOnly());
+
+        config.setScope(updateData.getScope());
+        config.setTargetDesignation(updateData.getTargetDesignation());
 
         return ResponseEntity.ok(dynamicFieldRepository.save(config));
     }
@@ -71,5 +81,36 @@ public class DynamicFieldController {
             return ResponseEntity.ok(dynamicFieldRepository.findByIsGlobalTrueOrEmployeeEmail(email));
         }
         return ResponseEntity.ok(dynamicFieldRepository.findAll());
+    }
+
+    @GetMapping("/designations-summary")
+    public ResponseEntity<List<Map<String, Object>>> getDesignationsSummary() {
+        List<User> employees = userRepository.findByRolesContaining(Role.EMPLOYEE);
+        Map<String, Integer> countMap = new HashMap<>();
+
+        for (User user : employees) {
+            String des = user.getDesignation();
+            if (des != null && !des.trim().isEmpty()) {
+                countMap.put(des.trim(), countMap.getOrDefault(des.trim(), 0) + 1);
+            }
+        }
+
+        List<Map<String, Object>> summary = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : countMap.entrySet()) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("designation", entry.getKey());
+            item.put("employeeCount", entry.getValue());
+            summary.add(item);
+        }
+        return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/employees-by-designation")
+    public ResponseEntity<List<User>> getEmployeesByDesignation(@RequestParam String designation) {
+        List<User> allEmployees = userRepository.findByRolesContaining(Role.EMPLOYEE);
+        List<User> filtered = allEmployees.stream()
+                .filter(u -> u.getDesignation() != null && u.getDesignation().trim().equalsIgnoreCase(designation.trim()))
+                .toList();
+        return ResponseEntity.ok(filtered);
     }
 }

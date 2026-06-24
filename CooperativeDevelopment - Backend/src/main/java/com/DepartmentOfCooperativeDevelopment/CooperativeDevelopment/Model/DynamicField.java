@@ -24,4 +24,7 @@ public class DynamicField {
 
     @JsonProperty("isAdminOnly")
     private boolean isAdminOnly;
+
+    private String scope; 
+    private String targetDesignation;
 }

@@ -4,6 +4,7 @@ import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.Increme
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.PasswordChangeRequest;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.RegisterRequest;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.DataChangeHistory;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.DynamicField;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,6 +35,7 @@ public interface UserService {
     void approveIncrementNotification(String notificationId);
     String generatePodu232Form(String notificationId);
     void saveOrUpdateExcelEmployees(List<User> excelUsers, String adminEmail);
+    DynamicField createDynamicField(DynamicField field);
     double calculateSickLeaveForIncrementYear(String email, java.time.LocalDate incrementDate);
     void updatePersonalFile(String email, User updateData, String currentUserEmail, Collection<? extends GrantedAuthority> authorities);
     List<com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Leave.LeaveEntitlement> getSickLeaveEntitlements(String email, int year);

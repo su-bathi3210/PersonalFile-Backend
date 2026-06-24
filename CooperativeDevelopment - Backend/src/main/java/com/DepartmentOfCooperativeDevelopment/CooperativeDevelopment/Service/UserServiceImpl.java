@@ -419,19 +419,32 @@ public class UserServiceImpl implements UserService {
 
             List<DynamicField> configs = dynamicFieldRepository.findAll();
             Map<String, DynamicField> configMap = new HashMap<>();
+
             for (DynamicField c : configs) {
-                configMap.put(c.getFieldKey(), c);
+                if ("GLOBAL".equalsIgnoreCase(c.getScope())) {
+                    configMap.put(c.getFieldKey(), c);
+                } else if ("DESIGNATION".equalsIgnoreCase(c.getScope())
+                        && userToUpdate.getDesignation() != null
+                        && userToUpdate.getDesignation().trim().equalsIgnoreCase(c.getTargetDesignation().trim())) {
+                    configMap.put(c.getFieldKey(), c);
+                } else if ("SPECIFIC".equalsIgnoreCase(c.getScope())) {
+                    configMap.put(c.getFieldKey(), c);
+                }
             }
 
             for (Map.Entry<String, Object> entry : updateData.getDynamicFields().entrySet()) {
                 String key = entry.getKey();
                 Object value = entry.getValue();
 
+                DynamicField config = configMap.get(key);
+                if (config == null) {
+                    throw new RuntimeException("Error: This field is not assigned to your designation or profile.");
+                }
+
                 String oldVal = userToUpdate.getDynamicFields().get(key) != null ? userToUpdate.getDynamicFields().get(key).toString() : "";
                 String newVal = value != null ? value.toString() : "";
 
                 if (!oldVal.trim().equals(newVal.trim())) {
-                    DynamicField config = configMap.get(key);
                     if (config != null && !isAdmin && config.isAdminOnly()) {
                         throw new RuntimeException("Error: You do not have permission to update the field: " + config.getDisplayName());
                     }
@@ -510,6 +523,28 @@ public class UserServiceImpl implements UserService {
         }
 
         userRepository.save(userToUpdate);
+    }
+
+    @Transactional
+    public DynamicField createDynamicField(DynamicField field) {
+        DynamicField savedField = dynamicFieldRepository.save(field);
+
+        if ("DESIGNATION".equalsIgnoreCase(field.getScope()) && field.getTargetDesignation() != null) {
+            List<User> employees = userRepository.findByRolesContaining(Role.EMPLOYEE);
+
+            for (User user : employees) {
+                if (user.getDesignation() != null && user.getDesignation().trim().equalsIgnoreCase(field.getTargetDesignation().trim())) {
+                    if (user.getDynamicFields() == null) {
+                        user.setDynamicFields(new HashMap<>());
+                    }
+                    if (!user.getDynamicFields().containsKey(field.getFieldKey())) {
+                        user.getDynamicFields().put(field.getFieldKey(), "");
+                        userRepository.save(user);
+                    }
+                }
+            }
+        }
+        return savedField;
     }
 
     @Override

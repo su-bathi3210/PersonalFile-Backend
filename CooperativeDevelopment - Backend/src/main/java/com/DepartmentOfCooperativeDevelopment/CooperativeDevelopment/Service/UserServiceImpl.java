@@ -438,7 +438,7 @@ public class UserServiceImpl implements UserService {
 
                 DynamicField config = configMap.get(key);
                 if (config == null) {
-                    throw new RuntimeException("Error: This field is not assigned to your designation or profile.");
+                    continue;
                 }
 
                 String oldVal = userToUpdate.getDynamicFields().get(key) != null ? userToUpdate.getDynamicFields().get(key).toString() : "";

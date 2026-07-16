@@ -1,5 +1,6 @@
 package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import java.util.Date;
 
@@ -16,6 +17,7 @@ public class VehicleRequestDTO {
     private String fromLocation;
     private String toLocation;
     private Double distanceKm;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm")
     private Date travelDateTime;
     private String reason;
 }

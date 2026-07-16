@@ -287,4 +287,31 @@ public class PersonalFileController {
                     .body(Map.of("message", "Failed to cancel request: " + e.getMessage()));
         }
     }
+
+    @GetMapping("/history-employees")
+    public ResponseEntity<List<User>> getEmployeesWithHistory() {
+        List<User> employeesWithChanges = userService.getEmployeesSortedByLatestHistory();
+        return ResponseEntity.ok(employeesWithChanges);
+    }
+
+    @PutMapping("/employees/{id}/deactivate")
+    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
+    public ResponseEntity<String> deactivateEmployee(@PathVariable String id) {
+        userService.deactivateEmployee(id);
+        return ResponseEntity.ok("Employee account successfully deactivated..");
+    }
+
+    @GetMapping("/employees/deactivated")
+    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
+    public ResponseEntity<List<User>> getDeactivatedEmployees() {
+        List<User> deactivated = userService.getDeactivatedEmployees();
+        return ResponseEntity.ok(deactivated);
+    }
+
+    @PutMapping("/{userId}/activate")
+    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
+    public ResponseEntity<String> activateEmployee(@PathVariable String userId) {
+        userService.activateEmployee(userId);
+        return ResponseEntity.ok("Employee reactivated successfully. Now the employee can log in.");
+    }
 }

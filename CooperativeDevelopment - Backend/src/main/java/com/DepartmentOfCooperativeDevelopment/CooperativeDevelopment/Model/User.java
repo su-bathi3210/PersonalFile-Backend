@@ -64,4 +64,7 @@ public class User {
 
     private String incrementStatus;
     private Map<String, Object> dynamicFields = new HashMap<>();
+
+    @Builder.Default
+    private boolean active = true;
 }

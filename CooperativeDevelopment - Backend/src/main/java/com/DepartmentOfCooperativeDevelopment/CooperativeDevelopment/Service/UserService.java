@@ -36,6 +36,10 @@ public interface UserService {
     String generatePodu232Form(String notificationId);
     void saveOrUpdateExcelEmployees(List<User> excelUsers, String adminEmail);
     DynamicField createDynamicField(DynamicField field);
+    List<User> getEmployeesSortedByLatestHistory();
+    void deactivateEmployee(String userId);
+    List<User> getDeactivatedEmployees();
+    void activateEmployee(String userId);
     double calculateSickLeaveForIncrementYear(String email, java.time.LocalDate incrementDate);
     void updatePersonalFile(String email, User updateData, String currentUserEmail, Collection<? extends GrantedAuthority> authorities);
     List<com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Leave.LeaveEntitlement> getSickLeaveEntitlements(String email, int year);

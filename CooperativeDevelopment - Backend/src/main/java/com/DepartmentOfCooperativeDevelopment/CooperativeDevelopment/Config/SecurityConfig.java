@@ -57,7 +57,7 @@ public class SecurityConfig {
 
                         .requestMatchers("/increment-form/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")
 
-                        .requestMatchers("vehicle-requests/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE", "DRIVER")
+                        .requestMatchers("/vehicle-requests/**").hasAnyRole("VEHICLE_ADMIN", "VEHICLE_APPROVAL", "EMPLOYEE", "DRIVER")
 
                         .requestMatchers("/personalfile/update-profile/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")
                         .requestMatchers("/personalfile/upload-employees").hasRole("PERSONALFILE_ADMIN")

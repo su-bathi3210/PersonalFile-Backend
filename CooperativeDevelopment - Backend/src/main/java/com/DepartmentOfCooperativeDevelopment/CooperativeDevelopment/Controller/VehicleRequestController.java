@@ -3,15 +3,20 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Controller
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleApprovalDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleRequestDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.RequestStatus;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.VehicleRequest;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.UserRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service.VehicleRequestService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/vehicle-requests")
@@ -19,6 +24,42 @@ import java.util.List;
 public class VehicleRequestController {
 
     private final VehicleRequestService vehicleRequestService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @GetMapping("/profile/{email}")
+    public ResponseEntity<?> getUserProfileByEmail(@PathVariable String email) {
+        java.util.Optional<User> userOpt = userRepository.findByEmail(email);
+
+        if (userOpt.isPresent()) {
+            return ResponseEntity.ok(userOpt.get());
+        } else {
+            java.util.Map<String, String> errorResponse = new java.util.HashMap<>();
+            errorResponse.put("message", "User not found with email: " + email);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/designations-summary")
+    public ResponseEntity<?> getDesignationsSummary() {
+        List<User> allUsers = userRepository.findAll();
+        Map<String, Long> summary = allUsers.stream()
+                .filter(u -> u.getDesignation() != null && !u.getDesignation().trim().isEmpty())
+                .collect(Collectors.groupingBy(
+                        user -> user.getDesignation().toUpperCase(),
+                        Collectors.counting()
+                ));
+        return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/by-designation")
+    public ResponseEntity<?> getUsersByDesignation(@RequestParam String designation) {
+        List<User> users = userRepository.findAll().stream()
+                .filter(u -> u.getDesignation() != null && u.getDesignation().equalsIgnoreCase(designation))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(users);
+    }
 
     @PostMapping
     public ResponseEntity<VehicleRequest> createVehicleRequest(@RequestBody VehicleRequestDTO dto) {
@@ -129,7 +170,7 @@ public class VehicleRequestController {
     }
 
     @PostMapping("/end-trip/{requestId}")
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasAnyRole('DRIVER', 'VEHICLE_ADMIN')")
     public ResponseEntity<VehicleRequest> endTripByDriver(@PathVariable String requestId) {
         try {
             VehicleRequest finalizedRequest = vehicleRequestService.endVehicleTrip(requestId);
@@ -217,6 +258,7 @@ public class VehicleRequestController {
     }
 
     @PostMapping("/start-trip/{id}")
+    @PreAuthorize("hasAnyRole('DRIVER', 'VEHICLE_ADMIN')")
     public ResponseEntity<VehicleRequest> startTrip(@PathVariable String id) {
         VehicleRequest startedRequest = vehicleRequestService.startTrip(id);
         return ResponseEntity.ok(startedRequest);

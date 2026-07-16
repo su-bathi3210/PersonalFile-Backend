@@ -3,6 +3,7 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -19,18 +20,19 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        var userOpt = userRepository.findByEmail(email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            return org.springframework.security.core.userdetails.User.builder()
-                    .username(user.getEmail())
-                    .password(user.getPassword())
-                    .authorities(user.getRoles().stream()
-                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
-                            .collect(Collectors.toList()))
-                    .build();
+        if (!user.isActive()) {
+            throw new DisabledException("Your account has been disabled. Please contact the administration department.");
         }
-        throw new UsernameNotFoundException("User not found with email: " + email);
+
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(user.getEmail())
+                .password(user.getPassword())
+                .authorities(user.getRoles().stream()
+                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
+                        .collect(Collectors.toList()))
+                .build();
     }
 }

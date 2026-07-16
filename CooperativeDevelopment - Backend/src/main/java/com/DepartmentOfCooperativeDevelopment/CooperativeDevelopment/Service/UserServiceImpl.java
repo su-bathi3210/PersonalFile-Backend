@@ -360,9 +360,9 @@ public class UserServiceImpl implements UserService {
         compareAndAdd(fieldChanges, "dateOfBirth",
                 userToUpdate.getDateOfBirth() != null ? userToUpdate.getDateOfBirth().toString() : null,
                 updateData.getDateOfBirth() != null ? updateData.getDateOfBirth().toString() : null);
+        compareAndAdd(fieldChanges, "wnopNumber", userToUpdate.getWnopNumber(), updateData.getWnopNumber());
 
         if (isAdmin) {
-            compareAndAdd(fieldChanges, "wnopNumber", userToUpdate.getWnopNumber(), updateData.getWnopNumber());
             compareAndAdd(fieldChanges, "serviceNumber", userToUpdate.getServiceNumber(), updateData.getServiceNumber());
             compareAndAdd(fieldChanges, "department", userToUpdate.getDepartment(), updateData.getDepartment());
             compareAndAdd(fieldChanges, "designation", userToUpdate.getDesignation(), updateData.getDesignation());
@@ -492,9 +492,9 @@ public class UserServiceImpl implements UserService {
         userToUpdate.setProfileImage(updateData.getProfileImage());
         userToUpdate.setGender(updateData.getGender());
         userToUpdate.setDateOfBirth(updateData.getDateOfBirth());
+        userToUpdate.setWnopNumber(updateData.getWnopNumber());
 
         if (isAdmin) {
-            userToUpdate.setWnopNumber(updateData.getWnopNumber());
             userToUpdate.setServiceNumber(updateData.getServiceNumber());
             userToUpdate.setDepartment(updateData.getDepartment());
             userToUpdate.setDesignation(updateData.getDesignation());
@@ -600,7 +600,10 @@ public class UserServiceImpl implements UserService {
     }
 
     public List<User> getAllEmployeesOnly() {
-        return userRepository.findByRolesContaining(Role.EMPLOYEE);
+        return userRepository.findByRolesContaining(Role.EMPLOYEE)
+                .stream()
+                .filter(User::isActive)
+                .toList();
     }
 
     @Override
@@ -994,5 +997,89 @@ public class UserServiceImpl implements UserService {
                 userRepository.save(excelUser);
             }
         }
+    }
+
+    @Override
+    public List<User> getEmployeesSortedByLatestHistory() {
+        List<DataChangeHistory> allHistory = historyRepository.findAll();
+
+        allHistory.sort((a, b) -> b.getChangedAt().compareTo(a.getChangedAt()));
+
+        java.util.Set<String> uniqueUserIds = new java.util.LinkedHashSet<>();
+        for (DataChangeHistory history : allHistory) {
+            if (history.getUserId() != null) {
+                uniqueUserIds.add(history.getUserId());
+            }
+        }
+        List<User> sortedEmployees = new java.util.ArrayList<>();
+        for (String userId : uniqueUserIds) {
+            userRepository.findById(userId).ifPresent(sortedEmployees::add);
+        }
+
+        return sortedEmployees;
+    }
+
+    @Override
+    @Transactional
+    public void deactivateEmployee(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+
+        user.setActive(false);
+        userRepository.save(user);
+
+        List<DataChangeHistory.FieldChange> fieldChanges = List.of(
+                new DataChangeHistory.FieldChange("active", "true", "false")
+        );
+
+        long currentCount = historyRepository.countByUserId(userId);
+        DataChangeHistory historyEntry = DataChangeHistory.builder()
+                .userId(userId)
+                .employeeName(user.getUsername())
+                .changedBy("PERSONALFILE_ADMIN")
+                .changedAt(LocalDateTime.now())
+                .revisionNumber((int) currentCount + 1)
+                .changes(fieldChanges)
+                .build();
+
+        historyRepository.save(historyEntry);
+    }
+
+    @Override
+    public List<User> getDeactivatedEmployees() {
+        return userRepository.findByRolesContaining(Role.EMPLOYEE)
+                .stream()
+                .filter(user -> !user.isActive())
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void activateEmployee(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+
+        if (user.isActive()) {
+            throw new RuntimeException("Employee is already active.");
+        }
+
+        user.setActive(true);
+        userRepository.save(user);
+
+        List<DataChangeHistory.FieldChange> fieldChanges = List.of(
+                new DataChangeHistory.FieldChange("active", "false", "true")
+        );
+
+        long currentCount = historyRepository.countByUserId(userId);
+        DataChangeHistory historyEntry = DataChangeHistory.builder()
+                .userId(userId)
+                .employeeName(user.getUsername())
+                .changedBy("PERSONALFILE_ADMIN")
+                .changedAt(LocalDateTime.now())
+                .revisionNumber((int) currentCount + 1)
+                .changes(fieldChanges)
+                .build();
+
+        historyRepository.save(historyEntry);
     }
 }

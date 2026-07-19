@@ -67,4 +67,5 @@ public class User {
 
     @Builder.Default
     private boolean active = true;
+    private String reason;
 }

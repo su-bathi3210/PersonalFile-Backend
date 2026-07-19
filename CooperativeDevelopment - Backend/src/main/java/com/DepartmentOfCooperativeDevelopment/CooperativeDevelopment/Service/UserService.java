@@ -37,10 +37,13 @@ public interface UserService {
     void saveOrUpdateExcelEmployees(List<User> excelUsers, String adminEmail);
     DynamicField createDynamicField(DynamicField field);
     List<User> getEmployeesSortedByLatestHistory();
-    void deactivateEmployee(String userId);
     List<User> getDeactivatedEmployees();
-    void activateEmployee(String userId);
+    void deactivateEmployee(String userId, String reason);
+    void activateEmployee(String userId, String reason);
     double calculateSickLeaveForIncrementYear(String email, java.time.LocalDate incrementDate);
+    void saveDesignationTemplates(String designation, List<String> templateNames);
+    List<String> getTemplatesForDesignation(String designation);
+    void processAutomatedIncrementCheck();
     void updatePersonalFile(String email, User updateData, String currentUserEmail, Collection<? extends GrantedAuthority> authorities);
     List<com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Leave.LeaveEntitlement> getSickLeaveEntitlements(String email, int year);
 }

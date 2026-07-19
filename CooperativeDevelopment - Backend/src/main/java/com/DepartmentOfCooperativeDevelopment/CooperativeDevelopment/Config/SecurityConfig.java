@@ -48,6 +48,10 @@ public class SecurityConfig {
 
                         .requestMatchers("/departments/add").hasRole("PERSONALFILE_ADMIN")
 
+                        .requestMatchers("/deactivation-reasons/**").hasRole("PERSONALFILE_ADMIN")
+
+                        .requestMatchers("/designation-templates/**").hasRole("PERSONALFILE_ADMIN")
+
                         .requestMatchers("/leave/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")
 
                         .requestMatchers("/dynamic-fields/**").hasAnyRole("PERSONALFILE_ADMIN", "EMPLOYEE")

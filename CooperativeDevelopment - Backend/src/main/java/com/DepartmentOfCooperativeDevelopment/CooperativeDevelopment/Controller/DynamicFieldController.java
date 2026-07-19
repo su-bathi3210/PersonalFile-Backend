@@ -50,7 +50,7 @@ public class DynamicFieldController {
         config.setAdminOnly(updateData.isAdminOnly());
 
         config.setScope(updateData.getScope());
-        config.setTargetDesignation(updateData.getTargetDesignation());
+        config.setTargetDesignations(updateData.getTargetDesignations());
 
         return ResponseEntity.ok(dynamicFieldRepository.save(config));
     }

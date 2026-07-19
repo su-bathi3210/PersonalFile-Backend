@@ -294,13 +294,6 @@ public class PersonalFileController {
         return ResponseEntity.ok(employeesWithChanges);
     }
 
-    @PutMapping("/employees/{id}/deactivate")
-    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
-    public ResponseEntity<String> deactivateEmployee(@PathVariable String id) {
-        userService.deactivateEmployee(id);
-        return ResponseEntity.ok("Employee account successfully deactivated..");
-    }
-
     @GetMapping("/employees/deactivated")
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
     public ResponseEntity<List<User>> getDeactivatedEmployees() {
@@ -308,10 +301,29 @@ public class PersonalFileController {
         return ResponseEntity.ok(deactivated);
     }
 
-    @PutMapping("/{userId}/activate")
+    @PutMapping("/{id}/deactivate")
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
-    public ResponseEntity<String> activateEmployee(@PathVariable String userId) {
-        userService.activateEmployee(userId);
-        return ResponseEntity.ok("Employee reactivated successfully. Now the employee can log in.");
+    public ResponseEntity<?> deactivateEmployee(
+            @PathVariable String id,
+            @RequestParam String reason) {
+        try {
+            userService.deactivateEmployee(id, reason);
+            return ResponseEntity.ok(Map.of("message", "Employee deactivated successfully."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/activate")
+    @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
+    public ResponseEntity<?> activateEmployee(
+            @PathVariable String id,
+            @RequestParam String reason) {
+        try {
+            userService.activateEmployee(id, reason);
+            return ResponseEntity.ok(Map.of("message", "Employee activated successfully."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

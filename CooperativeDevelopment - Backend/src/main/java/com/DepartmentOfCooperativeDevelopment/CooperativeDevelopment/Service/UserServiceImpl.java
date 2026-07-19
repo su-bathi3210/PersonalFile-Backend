@@ -7,6 +7,7 @@ import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Leave
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.*;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.IncrementNotificationResponse;
 
+import jakarta.mail.internet.MimeMessage;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -16,12 +17,14 @@ import org.springframework.data.mongodb.core.query.Query;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,6 +50,8 @@ public class UserServiceImpl implements UserService {
     private final DataChangeHistoryRepository historyRepository;
 
     private final DynamicFieldRepository dynamicFieldRepository;
+
+    private final DesignationTemplateMappingRepository designationTemplateMappingRepository;
 
     private final String UPLOAD_DIR = "uploads/increment-forms/";
 
@@ -112,65 +117,73 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void sendIncrementNotification(String userId, List<String> templateNames) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("No employee found."));
-
-        List<String> autoFilledFileUrls = new ArrayList<>();
-        Path uploadPath = Paths.get(UPLOAD_DIR);
-
-        double incYearSickLeave = calculateSickLeaveForIncrementYear(user.getEmail(), user.getIncrementDate());
-
+    public void sendIncrementNotification(String employeeId, List<String> templateNames) {
         try {
+            User employee = userRepository.findById(employeeId)
+                    .orElseThrow(() -> new RuntimeException("The employee was not found."));
+
+            int currentYear = 2026;
+            int oldYear = currentYear - 1;
+            String employeeEmail = employee.getEmail() != null ? employee.getEmail().trim().toLowerCase() : "";
+
+            double currentSickUsed = 0.0;
+            List<LeaveEntitlement> currentEntitlements = getSickLeaveEntitlements(employeeEmail, currentYear);
+            if (currentEntitlements != null && !currentEntitlements.isEmpty()) {
+                currentSickUsed = currentEntitlements.get(0).getUsedDays();
+            }
+
+            double oldSickUsed = 0.0;
+            List<LeaveEntitlement> oldEntitlements = getSickLeaveEntitlements(employeeEmail, oldYear);
+            if (oldEntitlements != null && !oldEntitlements.isEmpty()) {
+                oldSickUsed = oldEntitlements.get(0).getUsedDays();
+            }
+
+            double incYearSickUsed = calculateSickLeaveForIncrementYear(employeeEmail, employee.getIncrementDate());
+
+            List<String> generatedFilePaths = new ArrayList<>();
+            List<String> generatedFileNames = new ArrayList<>();
+
+            Path uploadPath = Paths.get(UPLOAD_DIR);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
             for (String templateName : templateNames) {
+                String outputFileName = System.currentTimeMillis() + "_" + employee.getUsername() + "_" + templateName;
+                Path targetPath = uploadPath.resolve(outputFileName);
+
                 org.springframework.core.io.ClassPathResource resource =
                         new org.springframework.core.io.ClassPathResource("templates/increment/" + templateName);
 
-                if (!resource.exists()) {
-                    System.err.println("Template not found inside jar resources: " + templateName);
-                    continue;
+                if (resource.exists()) {
+                    try (java.io.InputStream is = resource.getInputStream()) {
+                        generateAutoFilledDocxWithLeave(is, targetPath, employee, oldSickUsed, currentSickUsed, incYearSickUsed);
+                    }
+                    generatedFilePaths.add(targetPath.toString());
+                    generatedFileNames.add("/" + UPLOAD_DIR + outputFileName);
                 }
-
-                String generatedFileName = System.currentTimeMillis() + "_" + user.getUsername() + "_" + templateName;
-                Path targetPath = uploadPath.resolve(generatedFileName);
-
-                try (java.io.InputStream is = resource.getInputStream()) {
-                    generateAutoFilledDocx(is, targetPath, user, incYearSickLeave);
-                }
-
-                autoFilledFileUrls.add("/" + UPLOAD_DIR + generatedFileName);
             }
 
-        } catch (IOException e) {
-            throw new RuntimeException("Error processing auto-fill templates: " + e.getMessage());
+            Notification notification = new Notification();
+            notification.setUserId(employee.getId());
+            notification.setMessage("Your salary increment forms (including Podu 232) are ready. Please download, fill in and resubmit.");
+            notification.setStatus("PENDING");
+            notification.setIncrementType(true);
+            notification.setSubmittedFileUrls(generatedFileNames);
+            notification.setCreatedAt(LocalDateTime.now());
+            notificationRepository.save(notification);
+
+            emailService.sendIncrementEmailWithAttachments(employee.getEmail(), employee.getUsername(), generatedFilePaths);
+
+            employee.setIncrementStatus("EMAIL_SENT");
+            userRepository.save(employee);
+
+        } catch (Exception e) {
+            throw new RuntimeException("An error occurred while sending the notification: " + e.getMessage(), e);
         }
-
-        emailService.sendIncrementReminder(user.getEmail(), user.getUsername(), user.getIncrementDate());
-
-        user.setIncrementStatus("EMAIL_SENT");
-        userRepository.save(user);
-
-        Notification notification = Notification.builder()
-                .userId(userId)
-                .message("පාලන අංශය විසින් ඔබගේ වැටුප් වර්ධක පෝරම ඉදිරිපත් කරන ලෙස දන්වා ඇත. කරුණාකර පහත ස්වයංක්‍රීයව පිරවුණු ලේඛන බාගත කර, ඉතිරි කොටස් පුරවා නැවත උඩුගත කරන්න.")
-                .createdAt(LocalDateTime.now())
-                .isIncrementType(true)
-                .read(false)
-                .status("PENDING")
-                .originalIncrementDate(user.getIncrementDate())
-                .requestedTemplates(templateNames)
-                .generatedFileUrls(autoFilledFileUrls)
-                .submittedFileUrls(new ArrayList<>())
-                .build();
-
-        notificationRepository.save(notification);
     }
 
-    private void generateAutoFilledDocx(java.io.InputStream is, Path targetPath, User user, double incYearSickLeave) {
+    private void generateAutoFilledDocxWithLeave(java.io.InputStream is, Path targetPath, User user, double oldLeave, double currentLeave, double incYearSickLeave) {
         try (org.apache.poi.xwpf.usermodel.XWPFDocument doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(is);
              java.io.OutputStream os = Files.newOutputStream(targetPath)) {
 
@@ -182,6 +195,8 @@ public class UserServiceImpl implements UserService {
             dataToReplace.put("${grade}", user.getGrade() != null ? user.getGrade() : "");
             dataToReplace.put("${incrementDate}", user.getIncrementDate() != null ? user.getIncrementDate().toString() : "");
 
+            dataToReplace.put("${oldYearSickUsed}", String.valueOf((int) oldLeave));
+            dataToReplace.put("${currentYearSickUsed}", String.valueOf((int) currentLeave));
             dataToReplace.put("${incrementYearSickUsed}", String.valueOf((int) incYearSickLeave));
 
             for (org.apache.poi.xwpf.usermodel.XWPFParagraph p : doc.getParagraphs()) {
@@ -423,11 +438,14 @@ public class UserServiceImpl implements UserService {
             for (DynamicField c : configs) {
                 if ("GLOBAL".equalsIgnoreCase(c.getScope())) {
                     configMap.put(c.getFieldKey(), c);
-                } else if ("DESIGNATION".equalsIgnoreCase(c.getScope())
+                }
+                else if ("DESIGNATION".equalsIgnoreCase(c.getScope())
                         && userToUpdate.getDesignation() != null
-                        && userToUpdate.getDesignation().trim().equalsIgnoreCase(c.getTargetDesignation().trim())) {
+                        && c.getTargetDesignations() != null
+                        && c.getTargetDesignations().stream().anyMatch(d -> d.trim().equalsIgnoreCase(userToUpdate.getDesignation().trim()))) {
                     configMap.put(c.getFieldKey(), c);
-                } else if ("SPECIFIC".equalsIgnoreCase(c.getScope())) {
+                }
+                else if ("SPECIFIC".equalsIgnoreCase(c.getScope())) {
                     configMap.put(c.getFieldKey(), c);
                 }
             }
@@ -529,17 +547,22 @@ public class UserServiceImpl implements UserService {
     public DynamicField createDynamicField(DynamicField field) {
         DynamicField savedField = dynamicFieldRepository.save(field);
 
-        if ("DESIGNATION".equalsIgnoreCase(field.getScope()) && field.getTargetDesignation() != null) {
+        if ("DESIGNATION".equalsIgnoreCase(field.getScope()) && field.getTargetDesignations() != null) {
             List<User> employees = userRepository.findByRolesContaining(Role.EMPLOYEE);
 
             for (User user : employees) {
-                if (user.getDesignation() != null && user.getDesignation().trim().equalsIgnoreCase(field.getTargetDesignation().trim())) {
-                    if (user.getDynamicFields() == null) {
-                        user.setDynamicFields(new HashMap<>());
-                    }
-                    if (!user.getDynamicFields().containsKey(field.getFieldKey())) {
-                        user.getDynamicFields().put(field.getFieldKey(), "");
-                        userRepository.save(user);
+                if (user.getDesignation() != null) {
+                    boolean matchesDesignation = field.getTargetDesignations().stream()
+                            .anyMatch(d -> d.trim().equalsIgnoreCase(user.getDesignation().trim()));
+
+                    if (matchesDesignation) {
+                        if (user.getDynamicFields() == null) {
+                            user.setDynamicFields(new HashMap<>());
+                        }
+                        if (!user.getDynamicFields().containsKey(field.getFieldKey())) {
+                            user.getDynamicFields().put(field.getFieldKey(), "");
+                            userRepository.save(user);
+                        }
                     }
                 }
             }
@@ -772,8 +795,10 @@ public class UserServiceImpl implements UserService {
                 Files.createDirectories(uploadPath);
             }
 
+            double incYearSickUsed = calculateSickLeaveForIncrementYear(employeeEmail, user.getIncrementDate());
+
             try (java.io.InputStream is = resource.getInputStream()) {
-                generateAutoFilledDocxWithLeave(is, targetPath, user, oldSickUsed, currentSickUsed);
+                generateAutoFilledDocxWithLeave(is, targetPath, user, oldSickUsed, currentSickUsed, incYearSickUsed);
             }
 
         } catch (IOException e) {
@@ -1021,15 +1046,21 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void deactivateEmployee(String userId) {
+    public void deactivateEmployee(String userId, String reason) {
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new RuntimeException("Error: A reason must be provided to deactivate an employee.");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
         user.setActive(false);
+        user.setReason(reason);
         userRepository.save(user);
 
         List<DataChangeHistory.FieldChange> fieldChanges = List.of(
-                new DataChangeHistory.FieldChange("active", "true", "false")
+                new DataChangeHistory.FieldChange("active", "true", "false"),
+                new DataChangeHistory.FieldChange("status_change_reason", "", reason.trim())
         );
 
         long currentCount = historyRepository.countByUserId(userId);
@@ -1055,7 +1086,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void activateEmployee(String userId) {
+    public void activateEmployee(String userId, String reason) {
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new RuntimeException("Error: A reason must be provided to activate an employee.");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
@@ -1064,10 +1099,12 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setActive(true);
+        user.setReason(reason);
         userRepository.save(user);
 
         List<DataChangeHistory.FieldChange> fieldChanges = List.of(
-                new DataChangeHistory.FieldChange("active", "false", "true")
+                new DataChangeHistory.FieldChange("active", "false", "true"),
+                new DataChangeHistory.FieldChange("status_change_reason", "", reason.trim())
         );
 
         long currentCount = historyRepository.countByUserId(userId);
@@ -1081,5 +1118,60 @@ public class UserServiceImpl implements UserService {
                 .build();
 
         historyRepository.save(historyEntry);
+    }
+
+    @Override
+    @Transactional
+    public void saveDesignationTemplates(String designation, List<String> templateNames) {
+        String sanitizedDesignation = designation.trim();
+        Optional<DesignationTemplateMapping> existingMapping = designationTemplateMappingRepository.findByDesignation(sanitizedDesignation);
+
+        DesignationTemplateMapping mapping = existingMapping.orElse(new DesignationTemplateMapping());
+        mapping.setDesignation(sanitizedDesignation);
+        mapping.setTemplateNames(templateNames);
+
+        designationTemplateMappingRepository.save(mapping);
+    }
+
+    @Override
+    public List<String> getTemplatesForDesignation(String designation) {
+        return designationTemplateMappingRepository.findByDesignation(designation.trim())
+                .map(DesignationTemplateMapping::getTemplateNames)
+                .orElse(Collections.emptyList());
+    }
+
+    @Override
+    @Transactional
+    public void processAutomatedIncrementCheck() {
+        java.time.LocalDate targetDate = java.time.LocalDate.now().plusDays(14);
+        int targetMonth = targetDate.getMonthValue();
+        int targetDay = targetDate.getDayOfMonth();
+
+        List<User> activeEmployees = userRepository.findByRolesContaining(Role.EMPLOYEE)
+                .stream()
+                .filter(User::isActive)
+                .toList();
+
+        for (User employee : activeEmployees) {
+            if (employee.getIncrementDate() == null || employee.getDesignation() == null) {
+                continue;
+            }
+
+            int empMonth = employee.getIncrementDate().getMonthValue();
+            int empDay = employee.getIncrementDate().getDayOfMonth();
+
+            if (empMonth == targetMonth && empDay == targetDay) {
+                List<String> templates = getTemplatesForDesignation(employee.getDesignation());
+
+                if (!templates.isEmpty()) {
+                    try {
+                        sendIncrementNotification(employee.getId(), templates);
+                        System.out.println("✔ Automated process completed for: " + employee.getUsername());
+                    } catch (Exception e) {
+                        System.err.println("❌ Error in automated process for: " + employee.getUsername() + " -> " + e.getMessage());
+                    }
+                }
+            }
+        }
     }
 }

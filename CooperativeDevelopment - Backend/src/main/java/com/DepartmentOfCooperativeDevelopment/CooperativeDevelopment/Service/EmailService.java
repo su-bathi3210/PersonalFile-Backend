@@ -1,11 +1,14 @@
 package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service;
 
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.VehicleRequest;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -238,5 +241,30 @@ public class EmailService {
                 "• අදාළ නිලධාරියා: " + employeeName + "\n\n" +
                 "කරුණාකර නියමිත වේලාවට ගමන ආරම්භ කිරීමට සූදානම් වන්න. සුභ ගමනක්!\n- සමුපකාර සංවර්ධන දෙපාර්තමේන්තුව -");
         mailSender.send(message);
+    }
+
+    public void sendIncrementEmailWithAttachments(String toEmail, String username, List<String> filePaths) throws Exception {
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+        helper.setTo(toEmail);
+        helper.setSubject("වැටුප් වර්ධක මතක් කිරීම සහ ආකෘති පත්‍ර - Salary Increment Reminder");
+
+        String emailContent = "<h3>හිතවත් " + username + ",</h3>"
+                + "<p>ඔබගේ වැටුප් වර්ධක දිනය ඉදිරියේදී යෙදී ඇති බැවින් ඊට අදාළ ආකෘති පත්‍ර මෙයට අමුණා ඇත.</p>"
+                + "<p>කරුණාකර මෙම ලේඛන බාගත කර, සම්පූර්ණ කර පද්ධතිය (Dashboard) හරහා නැවත ඉදිරිපත් කරන්න.</p>"
+                + "<br><p>ස්තූතියි,<br>පාලන අංශය</p>";
+
+        helper.setText(emailContent, true);
+
+        for (String filePath : filePaths) {
+            File file = new File(filePath);
+            if (file.exists()) {
+                helper.addAttachment(file.getName(), file);
+            }
+        }
+
+        mailSender.send(mimeMessage);
+        System.out.println("✔ Email with attachments successfully sent to: " + toEmail);
     }
 }

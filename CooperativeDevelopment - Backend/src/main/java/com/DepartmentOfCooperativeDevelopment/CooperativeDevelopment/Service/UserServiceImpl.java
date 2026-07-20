@@ -166,10 +166,13 @@ public class UserServiceImpl implements UserService {
 
             Notification notification = new Notification();
             notification.setUserId(employee.getId());
-            notification.setMessage("Your salary increment forms (including Podu 232) are ready. Please download, fill in and resubmit.");
+            notification.setMessage("Your salary increment forms are ready. Please download, fill in and resubmit.");
             notification.setStatus("PENDING");
             notification.setIncrementType(true);
-            notification.setSubmittedFileUrls(generatedFileNames);
+
+            notification.setGeneratedFileUrls(generatedFileNames);
+            notification.setSubmittedFileUrls(new ArrayList<>());
+
             notification.setCreatedAt(LocalDateTime.now());
             notificationRepository.save(notification);
 
@@ -334,12 +337,13 @@ public class UserServiceImpl implements UserService {
                             .employeeName(user.getUsername())
                             .email(user.getEmail())
                             .phoneNumber(user.getPhoneNumber())
-                            .incrementDate(notification.getOriginalIncrementDate())
+                            .incrementDate(user.getIncrementDate())
                             .message(notification.getMessage())
                             .status(notification.getStatus())
                             .sentDate(notification.getCreatedAt())
                             .submittedDate(notification.getSubmittedAt())
                             .requestedTemplates(notification.getRequestedTemplates())
+                            .generatedFileUrls(notification.getGeneratedFileUrls())
                             .submittedFileUrls(notification.getSubmittedFileUrls())
 
                             .oldYearSickUsed(oldSickUsed)

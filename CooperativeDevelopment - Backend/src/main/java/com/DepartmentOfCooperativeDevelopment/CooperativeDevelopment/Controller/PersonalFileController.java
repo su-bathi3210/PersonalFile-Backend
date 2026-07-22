@@ -305,9 +305,15 @@ public class PersonalFileController {
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
     public ResponseEntity<?> deactivateEmployee(
             @PathVariable String id,
-            @RequestParam String reason) {
+            @RequestParam String reason,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate deactivatedDate,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate deathDate) {
         try {
-            userService.deactivateEmployee(id, reason);
+            userService.deactivateEmployee(id, reason, deactivatedDate, deathDate);
             return ResponseEntity.ok(Map.of("message", "Employee deactivated successfully."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -318,9 +324,12 @@ public class PersonalFileController {
     @PreAuthorize("hasRole('PERSONALFILE_ADMIN')")
     public ResponseEntity<?> activateEmployee(
             @PathVariable String id,
-            @RequestParam String reason) {
+            @RequestParam String reason,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate activatedDate) {
         try {
-            userService.activateEmployee(id, reason);
+            userService.activateEmployee(id, reason, activatedDate);
             return ResponseEntity.ok(Map.of("message", "Employee activated successfully."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

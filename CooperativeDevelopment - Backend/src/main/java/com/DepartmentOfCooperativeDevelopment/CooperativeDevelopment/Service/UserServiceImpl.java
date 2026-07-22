@@ -1050,34 +1050,42 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void deactivateEmployee(String userId, String reason) {
+    public void deactivateEmployee(
+            String userId,
+            String reason,
+            java.time.LocalDate deactivatedDate,
+            java.time.LocalDate deathDate) {
+
         if (reason == null || reason.trim().isEmpty()) {
             throw new RuntimeException("Error: A reason must be provided to deactivate an employee.");
         }
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
+        if (!user.isActive()) {
+            throw new RuntimeException("Employee is already deactivated.");
+        }
+
+        String trimmedReason = reason.trim();
+        boolean isDeathReason = "death".equalsIgnoreCase(trimmedReason);
+
+        if (isDeathReason) {
+            if (deathDate == null) {
+                throw new RuntimeException("Error: Death date must be provided when the reason is 'Death'.");
+            }
+            user.setDeathDate(deathDate);
+            user.setDeactivatedDate(null);
+        } else {
+            if (deactivatedDate == null) {
+                throw new RuntimeException("Error: Deactivation date must be provided for reason: " + trimmedReason);
+            }
+            user.setDeathDate(null);
+            user.setDeactivatedDate(deactivatedDate);
+        }
         user.setActive(false);
-        user.setReason(reason);
+        user.setReason(trimmedReason);
+
         userRepository.save(user);
-
-        List<DataChangeHistory.FieldChange> fieldChanges = List.of(
-                new DataChangeHistory.FieldChange("active", "true", "false"),
-                new DataChangeHistory.FieldChange("status_change_reason", "", reason.trim())
-        );
-
-        long currentCount = historyRepository.countByUserId(userId);
-        DataChangeHistory historyEntry = DataChangeHistory.builder()
-                .userId(userId)
-                .employeeName(user.getUsername())
-                .changedBy("PERSONALFILE_ADMIN")
-                .changedAt(LocalDateTime.now())
-                .revisionNumber((int) currentCount + 1)
-                .changes(fieldChanges)
-                .build();
-
-        historyRepository.save(historyEntry);
     }
 
     @Override
@@ -1090,38 +1098,25 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void activateEmployee(String userId, String reason) {
-        if (reason == null || reason.trim().isEmpty()) {
-            throw new RuntimeException("Error: A reason must be provided to activate an employee.");
-        }
-
+    public void activateEmployee(String userId, String reason, java.time.LocalDate activatedDate) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
-        if (user.isActive()) {
-            throw new RuntimeException("Employee is already active.");
+        boolean isDeactivatedDueToDeath = user.getReason() != null && "death".equalsIgnoreCase(user.getReason().trim());
+
+        if (isDeactivatedDueToDeath || user.getDeathDate() != null) {
+            throw new RuntimeException("Error: Cannot activate an employee account marked as Deceased/Death.");
         }
 
         user.setActive(true);
         user.setReason(reason);
+
+        user.setActivatedDate(activatedDate != null ? activatedDate : java.time.LocalDate.now());
+
+        user.setDeactivatedDate(null);
+        user.setDeathDate(null);
+
         userRepository.save(user);
-
-        List<DataChangeHistory.FieldChange> fieldChanges = List.of(
-                new DataChangeHistory.FieldChange("active", "false", "true"),
-                new DataChangeHistory.FieldChange("status_change_reason", "", reason.trim())
-        );
-
-        long currentCount = historyRepository.countByUserId(userId);
-        DataChangeHistory historyEntry = DataChangeHistory.builder()
-                .userId(userId)
-                .employeeName(user.getUsername())
-                .changedBy("PERSONALFILE_ADMIN")
-                .changedAt(LocalDateTime.now())
-                .revisionNumber((int) currentCount + 1)
-                .changes(fieldChanges)
-                .build();
-
-        historyRepository.save(historyEntry);
     }
 
     @Override

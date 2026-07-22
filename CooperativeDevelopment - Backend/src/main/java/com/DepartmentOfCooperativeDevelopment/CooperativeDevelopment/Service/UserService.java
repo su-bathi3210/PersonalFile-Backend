@@ -38,12 +38,17 @@ public interface UserService {
     DynamicField createDynamicField(DynamicField field);
     List<User> getEmployeesSortedByLatestHistory();
     List<User> getDeactivatedEmployees();
-    void deactivateEmployee(String userId, String reason);
-    void activateEmployee(String userId, String reason);
     double calculateSickLeaveForIncrementYear(String email, java.time.LocalDate incrementDate);
     void saveDesignationTemplates(String designation, List<String> templateNames);
     List<String> getTemplatesForDesignation(String designation);
     void processAutomatedIncrementCheck();
+    void deactivateEmployee(
+            String userId,
+            String reason,
+            java.time.LocalDate deactivatedDate,
+            java.time.LocalDate deathDate
+    );
+    void activateEmployee(String userId, String reason, java.time.LocalDate activatedDate);
     void updatePersonalFile(String email, User updateData, String currentUserEmail, Collection<? extends GrantedAuthority> authorities);
     List<com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.Leave.LeaveEntitlement> getSickLeaveEntitlements(String email, int year);
 }

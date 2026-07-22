@@ -68,4 +68,8 @@ public class User {
     @Builder.Default
     private boolean active = true;
     private String reason;
+
+    private LocalDate deactivatedDate;
+    private LocalDate activatedDate;
+    private LocalDate deathDate;
 }

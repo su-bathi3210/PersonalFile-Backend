@@ -2,6 +2,7 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Controller
 
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleApprovalDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleRequestDTO;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleRequestUpdateDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.RequestStatus;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.User;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.VehicleRequest;
@@ -251,7 +252,7 @@ public class VehicleRequestController {
     public ResponseEntity<String> sendTodayTripsEmail() {
         try {
             vehicleRequestService.sendTodayTripsToAdmin();
-            return ResponseEntity.ok("අද දවසේ Trips ලැයිස්තුව Admin වෙත සාර්ථකව Email කරන ලදී.");
+            return ResponseEntity.ok("Today's Trips list was successfully emailed to Admin.");
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -262,5 +263,18 @@ public class VehicleRequestController {
     public ResponseEntity<VehicleRequest> startTrip(@PathVariable String id) {
         VehicleRequest startedRequest = vehicleRequestService.startTrip(id);
         return ResponseEntity.ok(startedRequest);
+    }
+
+    @PutMapping("/{id}/update")
+    public ResponseEntity<?> updateVehicleRequest(
+            @PathVariable("id") String requestId,
+            @RequestParam("email") String employeeEmail,
+            @RequestBody VehicleRequestUpdateDTO dto) {
+        try {
+            VehicleRequest updatedRequest = vehicleRequestService.updateVehicleRequestByEmployee(requestId, employeeEmail, dto);
+            return ResponseEntity.ok(updatedRequest);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }

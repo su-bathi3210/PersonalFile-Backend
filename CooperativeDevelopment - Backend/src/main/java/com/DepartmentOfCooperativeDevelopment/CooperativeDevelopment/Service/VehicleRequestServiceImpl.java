@@ -2,6 +2,7 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service;
 
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleApprovalDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleRequestDTO;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleRequestUpdateDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.*;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.VehicleAdminConfigRepository;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Repository.VehicleApprovalOfficerConfigRepository;
@@ -14,6 +15,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 @Service
@@ -118,14 +121,60 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
             throw new RuntimeException("Error: This request has been cancelled by the employee and cannot be modified.");
         }
 
+        java.time.LocalDateTime localStart = request.getTravelDateTime().toInstant()
+                .atZone(java.time.ZoneId.systemDefault()).toLocalDate().atStartOfDay();
+        java.time.LocalDateTime localEnd = localStart.plusDays(1).minusNanos(1);
+
+        Date dayStart = Date.from(localStart.atZone(java.time.ZoneId.systemDefault()).toInstant());
+        Date dayEnd = Date.from(localEnd.atZone(java.time.ZoneId.systemDefault()).toInstant());
+
+        List<VehicleRequest> vehicleConflicts = repository.findConflictingVehicleRequestsInRange(
+                approvalDTO.getVehicleId(),
+                dayStart,
+                dayEnd,
+                requestId
+        );
+        if (!vehicleConflicts.isEmpty()) {
+            VehicleRequest conflictingReq = vehicleConflicts.get(0);
+
+            String vInfo = conflictingReq.getAssignedVehicle() != null ?
+                    conflictingReq.getAssignedVehicle().getVehicleNumber() : "Vehicle";
+            String dInfo = conflictingReq.getAssignedDriver() != null ?
+                    conflictingReq.getAssignedDriver().getName() : "Driver";
+
+            throw new RuntimeException("Error: The selected vehicle (" + vInfo + ") is already ALLOCATED for "
+                    + conflictingReq.getTravelDateTime()
+                    + " to Requester: " + conflictingReq.getRequesterEmail()
+                    + " (Assigned Driver: " + dInfo + ")");
+        }
+
+        List<VehicleRequest> driverConflicts = repository.findConflictingDriverRequestsInRange(
+                approvalDTO.getDriverId(),
+                dayStart,
+                dayEnd,
+                requestId
+        );
+        if (!driverConflicts.isEmpty()) {
+            VehicleRequest conflictingReq = driverConflicts.get(0);
+
+            String dInfo = conflictingReq.getAssignedDriver() != null ?
+                    conflictingReq.getAssignedDriver().getName() : "Driver";
+
+            throw new RuntimeException("Error: The selected driver (" + dInfo + ") is already ALLOCATED for "
+                    + conflictingReq.getTravelDateTime()
+                    + " to Requester: " + conflictingReq.getRequesterEmail());
+        }
+
         Vehicle vehicle = vehicleRepository.findById(approvalDTO.getVehicleId())
                 .orElseThrow(() -> new RuntimeException("The vehicle could not be found."));
-        vehicle.setStatus("BOOKED");
-        vehicleRepository.save(vehicle);
 
         Driver driver = driverRepository.findById(approvalDTO.getDriverId())
                 .orElseThrow(() -> new RuntimeException("The driver could not be found."));
-        driver.setStatus("BOOKED");
+
+        vehicle.setStatus("ALLOCATED");
+        vehicleRepository.save(vehicle);
+
+        driver.setStatus("ALLOCATED");
         driverRepository.save(driver);
 
         request.setAssignedVehicleId(approvalDTO.getVehicleId());
@@ -133,6 +182,7 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
         request.setAssignedVehicle(vehicle);
         request.setAssignedDriver(driver);
         request.setStatus(RequestStatus.APPROVED_BY_VEHICLE_ADMIN);
+
         VehicleRequest updatedRequest = repository.save(request);
 
         String officerEmail = getVehicleApprovalOfficerEmail();
@@ -202,6 +252,10 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
             throw new RuntimeException("Error: This request has been cancelled by the employee and cannot be modified.");
         }
 
+        if (request.getStatus() == RequestStatus.TRIP_STARTED || request.getStatus() == RequestStatus.COMPLETED) {
+            throw new RuntimeException("Error: Cannot cancel a trip that has already started or completed.");
+        }
+
         releaseResources(request);
 
         request.setAdminRemarks(adminRemarks);
@@ -221,6 +275,7 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
                 System.out.println("Officer Email failed on Admin Rejection: " + e.getMessage());
             }
         }
+
         return updatedRequest;
     }
 
@@ -259,7 +314,10 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
 
     @Override
     public List<VehicleRequest> getOfficerApprovedRequests() {
-        return repository.findByStatus(RequestStatus.APPROVED_BY_VEHICLE_APPROVAL_OFFICER);
+        return repository.findByStatusIn(Arrays.asList(
+                RequestStatus.APPROVED_BY_VEHICLE_APPROVAL_OFFICER,
+                RequestStatus.TRIP_PROCESS_CONFIRMED
+        ));
     }
 
     @Override
@@ -295,6 +353,34 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
             System.out.println("Email sending failed: " + e.getMessage());
         }
         request.setStatus(RequestStatus.TRIP_PROCESS_CONFIRMED);
+        return repository.save(request);
+    }
+
+    @Override
+    @Transactional
+    public VehicleRequest startTrip(String id) {
+        VehicleRequest request = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("The requested vehicle could not be found. ID: " + id));
+
+        if (request.getStatus() != RequestStatus.TRIP_PROCESS_CONFIRMED) {
+            throw new RuntimeException("This journey can only be started after approval by the Admin.");
+        }
+
+        if (request.getAssignedVehicleId() != null) {
+            vehicleRepository.findById(request.getAssignedVehicleId()).ifPresent(v -> {
+                v.setStatus("BOOKED");
+                vehicleRepository.save(v);
+            });
+        }
+
+        if (request.getAssignedDriverId() != null) {
+            driverRepository.findById(request.getAssignedDriverId()).ifPresent(d -> {
+                d.setStatus("BOOKED");
+                driverRepository.save(d);
+            });
+        }
+
+        request.setStatus(RequestStatus.TRIP_STARTED);
         return repository.save(request);
     }
 
@@ -366,7 +452,7 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
             throw new RuntimeException("Error: You are not authorized to cancel this request!");
         }
 
-        if (request.getStatus() == RequestStatus.TRIP_PROCESS_CONFIRMED || request.getStatus() == RequestStatus.COMPLETED) {
+        if (request.getStatus() == RequestStatus.TRIP_STARTED || request.getStatus() == RequestStatus.COMPLETED) {
             throw new RuntimeException("Error: Cannot cancel a trip that has already started or completed.");
         }
 
@@ -382,7 +468,7 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
                         adminEmail,
                         cancelledRequest.getId(),
                         cancelledRequest.getRequesterName(),
-                        "සේවකයා විසින් පද්ධතිය හරහා අවලංගු කරන ලදී."
+                        "The employee canceled through the system."
                 );
             } catch (Exception e) {
                 System.out.println("Admin Email failed on Employee Cancel: " + e.getMessage());
@@ -444,8 +530,6 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
 
         emailService.sendTodayTripsNotificationEmail(adminEmail, todayRequests);
     }
-
-    //@org.springframework.scheduling.annotation.Scheduled(cron = "*/10 * * * * ?")
 
     @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 6 * * ?")
     public void autoSendTodayTrips() {
@@ -518,14 +602,28 @@ public class VehicleRequestServiceImpl implements VehicleRequestService {
 
     @Override
     @Transactional
-    public VehicleRequest startTrip(String id) {
-        VehicleRequest request = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("The requested vehicle could not be found. ID: " + id));
+    public VehicleRequest updateVehicleRequestByEmployee(String requestId, String employeeEmail, VehicleRequestUpdateDTO dto) {
+        VehicleRequest request = repository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("The vehicle request could not be found."));
 
-        if (request.getStatus() != RequestStatus.TRIP_PROCESS_CONFIRMED) {
-            throw new RuntimeException("This journey can only be started after approval by the Admin.");
+        if (!request.getRequesterEmail().equalsIgnoreCase(employeeEmail)) {
+            throw new RuntimeException("Error: You are not authorized to update this request!");
         }
-        request.setStatus(RequestStatus.TRIP_STARTED);
+
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new RuntimeException("Error: Only PENDING requests can be updated by the employee.");
+        }
+
+        if (dto.getFromLocation() != null) request.setFromLocation(dto.getFromLocation());
+        if (dto.getToLocation() != null) request.setToLocation(dto.getToLocation());
+        if (dto.getDistanceKm() != null) request.setDistanceKm(dto.getDistanceKm());
+        if (dto.getTravelDateTime() != null) request.setTravelDateTime(dto.getTravelDateTime());
+        if (dto.getDutyNature() != null) request.setDutyNature(dto.getDutyNature());
+        if (dto.getReason() != null) request.setReason(dto.getReason());
+        if (dto.getPhoneNumber() != null) request.setPhoneNumber(dto.getPhoneNumber());
+        if (dto.getRequesterPosition() != null) request.setRequesterPosition(dto.getRequesterPosition());
+        if (dto.getDepartment() != null) request.setDepartment(dto.getDepartment());
+
         return repository.save(request);
     }
 }

@@ -2,6 +2,7 @@ package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Service;
 
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleApprovalDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleRequestDTO;
+import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.DTO.VehicleRequestUpdateDTO;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.RequestStatus;
 import com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model.VehicleRequest;
 import java.util.List;
@@ -31,5 +32,6 @@ public interface VehicleRequestService {
     List<VehicleRequest> getTodayVehicleRequests();
     void sendTodayTripsToAdmin();
     VehicleRequest startTrip(String id);
+    VehicleRequest updateVehicleRequestByEmployee(String requestId, String employeeEmail, VehicleRequestUpdateDTO dto);
     VehicleRequest approveVehicleRequest(String requestId, VehicleApprovalDTO approvalDTO);
 }

@@ -1,5 +1,6 @@
 package com.DepartmentOfCooperativeDevelopment.CooperativeDevelopment.Model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -26,7 +27,10 @@ public class VehicleRequest {
     private String fromLocation;
     private String toLocation;
     private Double distanceKm;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "Asia/Colombo")
     private Date travelDateTime;
+
     private String reason;
 
     private String assignedVehicleId;
@@ -41,5 +45,7 @@ public class VehicleRequest {
     private String adminRemarks;
 
     private RequestStatus status = RequestStatus.PENDING;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "Asia/Colombo")
     private Date createdAt = new Date();
 }
